@@ -249,15 +249,17 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         ##############################################
         # SUBPROBLEM
         ##############################################
-        # variable has structure (d,r,z) in R^(dim+J+1)
         print("H EIGVALS", np.linalg.eigh(H)[0])
 
-
+        SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
         
-        # extract dual variables = KKT multipliers
-        lambda_f = np.array(qp['z'][:sample_f]).squeeze()
-        lambda_G = [np.array(qp['z'][sample_f + sample_G*(j):sample_f + sample_G*(j+1)]).squeeze() for j in np.arange(nI)]
-        g_k = lambda_f @ D_f + np.sum([lambda_G[j] @ D_gI[j] for j in range(nI)], axis = 0)
+        SP.solve()
+        
+        d_k = SP.d.copy()
+        # compute g_k from paper 
+        g_k = SP.lambda_f @ D_f + np.sum([SP.lambda_gI[j] @ D_gI[j] for j in range(nI)], axis = 0)  \
+                             +  np.sum([SP.lambda_gE[j] @ D_gE[j] for j in range(nE)], axis = 0)
+                                
         
         
         v_k = np.maximum(gI_k, 0).sum()
@@ -266,7 +268,7 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         
         delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, D_f, D_gI) 
         assert delta_q >= -1e-5
-        assert np.abs(lambda_f.sum() - rho) <= 1e-6
+        assert np.abs(SP.lambda_f.sum() - rho) <= 1e-6
         
         Gvals_samples = [np.array([G[j].eval(B_G[j][i,:]) for i in np.arange(sample_G)]) for j in np.arange(nI)]
         
@@ -284,26 +286,23 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         step = delta_q > nu*eps**2 
         if step:
             alpha = 1.
-            phi_new = phi_rho(x_k + alpha*d_k, f, G, rho)
+            phi_new = phi_rho(x_k + alpha*d_k, f, gI, gE, rho)
             
             # Armijo step size rule
             while phi_new > phi_k - eta*alpha*delta_q:                
                 alpha *= gamma
-                phi_new = phi_rho(x_k + alpha*d_k, f, G, rho)
-            
-            
+                phi_new = phi_rho(x_k + alpha*d_k, f, gI, gE, rho)
+                
             # update Hessian
             if x_kmin1 is not None:
                 s_k = x_k - x_kmin1
                 s_hist = np.roll(s_hist, 1, axis = 1)
                 s_hist[:,0] = s_k
                 
-
                 y_k = g_k - g_kmin1
                 y_hist = np.roll(y_hist, 1, axis = 1)
                 y_hist[:,0] = y_k
-                
-                
+                                
                 hH = np.eye(dim)
                 for l in np.arange(iter_H):
                     sl = s_hist[:,l]
@@ -317,9 +316,7 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
                     
                 assert np.all(np.abs(hH - hH.T) <= 1e-8), f"{H}"
                 
-                
                 H = hH.copy()
-                
                 
             ####################################
             # ACTUAL STEP
@@ -343,8 +340,6 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         
         x_hist.append(x_k)
             
-    
-    
     ##############################################
     # END OF LOOP
     ##############################################
@@ -356,54 +351,19 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
     print(f"SQP GS terminate with status {status}")
     
     return x_k, x_hist
-        
-#%%
-f = ftest()
-g = gtest()
-#D = Net(model)
-#G=[D]
-
-gI=[g]
-
-
-X, Y = np.meshgrid(np.linspace(-2,2,100), np.linspace(-2,2,100))
-Z = np.zeros_like(X)
-
-for j in np.arange(100):
-    for i in np.arange(100):
-        Z[i,j] = f.eval(np.array([X[i,j], Y[i,j]]))
-
-
-plt.figure()
-plt.contourf(X,Y,Z, levels = 20)
-
-for i in range(20):
-    x_k, x_hist = SQP_GS(f, gI, tol = 1e-8, verbose = True)
-    print(x_k)
-    plt.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 1)
-
-plt.xlim(-2,2)
-plt.ylim(-2,2)
-# x = np.zeros(2)
-# eps = 1
-# N = 1000
-# Y = sample_points(x, eps, N)
-
-# plt.scatter(Y[:,0], Y[:,1])
-
-#%%
-xsol1 = np.array([0.7071067,  0.49999994])
-xsol2 = np.array([0.64982465, 0.42226049])
-f.eval(xsol2)
-g.eval(xsol2)
-f.eval(xsol1)
-#D.eval(xsol1)
-
 
 #%%
 
 class Subproblem:
     def __init__(self, dim, nI, nE, p0, pI, pE):
+        """
+        dim : solution space dimension
+        nI : number of inequality constraints
+        nE : number of equality constraints
+        p0 : number of sample points for f (excluding x_k itself)
+        pI : array, number of sample points for inequality constraint (excluding x_k itself)
+        pE : array, number of sample points for equality constraint (excluding x_k itself)
+        """
         
         self.dim = dim
         self.nI = nI
@@ -454,6 +414,7 @@ class Subproblem:
             # from ineq with -
             vec2 = np.array(qp['z'][start_ix+(1+self.pE).sum() : start_ix + (1+self.pE).sum() + 1+self.pE[j]]).squeeze()
             
+            # see Direction.m line 620
             lambda_gE.append(vec1-vec2)
      
         self.lambda_f = lambda_f.copy()
@@ -464,14 +425,7 @@ class Subproblem:
         
         
     def initialize(self):
-        """
-        dim : solution space dimension
-        nI : number of inequality constraints
-        nE : number of equality constraints
-        p0 : number of sample points for f (excluding x_k itself)
-        pI : array, number of sample points for inequality constraint (excluding x_k itself)
-        pE : array, number of sample points for equality constraint (excluding x_k itself)
-        """
+
         
         dimQP = self.dim+1+self.nI+self.nE
         
@@ -521,7 +475,52 @@ class Subproblem:
             self.inh[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1] = gE_k[j]
             
        
-        return 
+        return        
+    
+#%%
+f = ftest()
+g = gtest()
+#D = Net(model)
+#G=[D]
+
+gI=[g]
+
+
+X, Y = np.meshgrid(np.linspace(-2,2,100), np.linspace(-2,2,100))
+Z = np.zeros_like(X)
+
+for j in np.arange(100):
+    for i in np.arange(100):
+        Z[i,j] = f.eval(np.array([X[i,j], Y[i,j]]))
+
+
+plt.figure()
+plt.contourf(X,Y,Z, levels = 20)
+
+for i in range(20):
+    x_k, x_hist = SQP_GS(f, gI, tol = 1e-8, verbose = True)
+    print(x_k)
+    plt.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 1)
+
+plt.xlim(-2,2)
+plt.ylim(-2,2)
+# x = np.zeros(2)
+# eps = 1
+# N = 1000
+# Y = sample_points(x, eps, N)
+
+# plt.scatter(Y[:,0], Y[:,1])
+
+#%%
+xsol1 = np.array([0.7071067,  0.49999994])
+xsol2 = np.array([0.64982465, 0.42226049])
+f.eval(xsol2)
+g.eval(xsol2)
+f.eval(xsol1)
+#D.eval(xsol1)
+
+
+
 
 
 #%%
