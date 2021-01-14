@@ -1,1 +1,1 @@
-# sqp-gs
+# ncOPT
