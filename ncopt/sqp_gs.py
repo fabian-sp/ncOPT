@@ -4,15 +4,6 @@ import cvxopt as cx
 import torch
 
 from scipy.linalg import block_diag
-
-# def gradient(self, X):
-#     (N, dim) = X.shape
-    
-#     D = np.zeros(X.shape)
-#     for i in np.arange(N):
-#         D[i,:] = self.grad(X[i,:])
-        
-#     return D
     
 def sample_points(x, eps, N):
     """
@@ -146,6 +137,27 @@ def phi_rho(x, f, gI, gE, rho):
     
     return term1+term2+term3
 
+def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI, nE, pI, pE):
+    
+    val1 = np.linalg.norm(g_k, np.inf)
+    
+    # as gI or gE could be empty, we need a max value for empty arrays --> initial argument
+    val2 = np.max(gI_k, initial = -np.inf)
+    val3 = np.max(np.abs(gE_k), initial = -np.inf)
+    
+    gI_vals = [np.array([gI[j].eval(B_gI[j][i,:]) for i in np.arange(pI[j]+1)]) for j in np.arange(nI)]
+    val4 = -np.inf
+    for j in np.arange(nI):
+        val4 = np.maximum(val4, np.max(SP.lambda_gI[j] * gI_vals[j]))
+    
+    gE_vals = [np.array([gE[j].eval(B_gE[j][i,:]) for i in np.arange(pE[j]+1)]) for j in np.arange(nE)]
+    val5 = -np.inf
+    for j in np.arange(nE):
+        val5 = np.maximum(val5, np.max(SP.lambda_gE[j] * gE_vals[j]))
+    
+    return np.max(np.array([val1, val2, val3, val4, val5]))
+ 
+
 def compute_gradients(fun, X):
     """ computes gradients of function object f at all rows of array X
     """
@@ -157,15 +169,19 @@ def compute_gradients(fun, X):
             
     return D   
 
-def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
+def SQP_GS(f, gI, gE, tol = 1e-8, verbose = True):
     
     eps = 1e-1
     rho = 1e-1
     theta = 1e-1
     
-    p0 = 2
-    pI = 3
-    pE = 4
+    dim = f.dim
+    nI = len(gI)
+    nE = len(gE)
+    
+    p0 = 2 
+    pI = 3 *np.ones(nI, dtype = int)
+    pE = 4 *np.ones(nE, dtype = int)
     
     eta = 1e-8
     gamma = 0.5
@@ -176,10 +192,6 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
     xi_s = 1e3
     xi_y = 1e3
     xi_sy = 1e-6
-    
-    dim = f.dim
-    nI = len(gI)
-    nE = len(gE)
     
     # initialize subproblem object
     SP = Subproblem(dim, nI, nE, p0, pI, pE)
@@ -221,13 +233,13 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         
         B_gI = list()
         for j in np.arange(nI):
-            B_j = sample_points(x_k, eps, pI)
+            B_j = sample_points(x_k, eps, pI[j])
             B_j = np.vstack((x_k, B_j))
             B_gI.append(B_j)
             
         B_gE = list()
         for j in np.arange(nE):
-            B_j = sample_points(x_k, eps, pE)
+            B_j = sample_points(x_k, eps, pE[j])
             B_j = np.vstack((x_k, B_j))
             B_gE.append(B_j)
             
@@ -249,7 +261,7 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
         ##############################################
         # SUBPROBLEM
         ##############################################
-        print("H EIGVALS", np.linalg.eigh(H)[0])
+        #print("H EIGVALS", np.linalg.eigh(H)[0])
 
         SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
         
@@ -261,25 +273,21 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
                              +  np.sum([SP.lambda_gE[j] @ D_gE[j] for j in range(nE)], axis = 0)
                                 
         
-        
-        v_k = np.maximum(gI_k, 0).sum()
+        # evaluate v(x) at x=x_k
+        v_k = np.maximum(gI_k, 0).sum() + np.sum(np.abs(gE_k))
         phi_k = rho*f_k + v_k
         
+        delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE) 
         
-        delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, D_f, D_gI) 
         assert delta_q >= -1e-5
-        assert np.abs(SP.lambda_f.sum() - rho) <= 1e-6
+        assert np.abs(SP.lambda_f.sum() - rho) <= 1e-6, f"{np.abs(SP.lambda_f.sum() - rho)}"
         
-        Gvals_samples = [np.array([G[j].eval(B_G[j][i,:]) for i in np.arange(sample_G)]) for j in np.arange(nI)]
-        
-        term3 = np.max([np.max(lambda_G[j] * Gvals_samples[j]) for j in np.arange(nI)])        
-        new_E_k = np.max([np.linalg.norm(g_k, np.inf), np.max(gI_k), term3])
-        
-        E_k = min(E_k, new_E_k)
-        
+
         if verbose:
             print(out_fmt % (iter_k, f_k, np.max(gI_k), E_k, step))
         
+        new_E_k = stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI, nE, pI, pE)
+        E_k = min(E_k, new_E_k)
         ##############################################
         # STEP
         ##############################################
@@ -350,7 +358,7 @@ def SQP_GS(f, gI, gE = [], tol = 1e-8, verbose = True):
     
     print(f"SQP GS terminate with status {status}")
     
-    return x_k, x_hist
+    return x_k, x_hist, SP
 
 #%%
 
@@ -383,36 +391,37 @@ class Subproblem:
         
         qp = cx.solvers.qp(P = cx.matrix(self.P), q = cx.matrix(self.q), G = cx.matrix(iG), h = cx.matrix(ih))
         
-        print(qp['x'])
-        print(qp['z'])
-        print(len(qp['z']))
+        self.cvx_sol_x = np.array(qp['x']).squeeze()
         
-        self.d = np.array(qp['x'][:self.dim]).squeeze()
-        self.z = np.array(qp['x'][self.dim]).squeeze()
-        self.rI = np.array(qp['x'][self.dim +1          : self.dim +1 +self.nI]).squeeze()
-        self.rE = np.array(qp['x'][self.dim +1 +self.nI : ]).squeeze()
+        self.d = self.cvx_sol_x[:self.dim]
+        self.z = self.cvx_sol_x[self.dim]
+
+        self.rI = self.cvx_sol_x[self.dim +1          : self.dim +1 +self.nI]
+        self.rE = self.cvx_sol_x[self.dim +1 + self.nI : ]
         
+
         assert len(self.rE) == self.nE
-        assert np.all(self.rI >= -1e-5) 
-        assert np.all(self.rE >= -1e-5) 
+        assert np.all(self.rI >= -1e-5) , f"{self.rI}"
+        assert np.all(self.rE >= -1e-5), f"{self.rE}"
         
         # extract dual variables = KKT multipliers
-        lambda_f = np.array(qp['z'][:self.p0+1]).squeeze()
+        self.cvx_sol_z = np.array(qp['z']).squeeze()
+        lambda_f = self.cvx_sol_z[:self.p0+1]
         
         lambda_gI = list()
         for j in np.arange(self.nI):
             start_ix = self.p0+1+(1+self.pI)[:j].sum()
-            lambda_gI.append(np.array(qp['z'][start_ix : start_ix + 1+self.pI[j]]).squeeze())
+            lambda_gI.append( self.cvx_sol_z[start_ix : start_ix + 1+self.pI[j]]  )
         
         lambda_gE = list()
         for j in np.arange(self.nE):
             start_ix = self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()
             
             # from ineq with +
-            vec1 = np.array(qp['z'][start_ix : start_ix + 1+self.pE[j]]).squeeze()
+            vec1 = self.cvx_sol_z[start_ix : start_ix + 1+self.pE[j]]
             
             # from ineq with -
-            vec2 = np.array(qp['z'][start_ix+(1+self.pE).sum() : start_ix + (1+self.pE).sum() + 1+self.pE[j]]).squeeze()
+            vec2 = self.cvx_sol_z[start_ix+(1+self.pE).sum() : start_ix + (1+self.pE).sum() + 1+self.pE[j]]
             
             # see Direction.m line 620
             lambda_gE.append(vec1-vec2)
@@ -481,10 +490,9 @@ class Subproblem:
 f = ftest()
 g = gtest()
 #D = Net(model)
-#G=[D]
 
 gI=[g]
-
+gE = [g]
 
 X, Y = np.meshgrid(np.linspace(-2,2,100), np.linspace(-2,2,100))
 Z = np.zeros_like(X)
@@ -498,18 +506,13 @@ plt.figure()
 plt.contourf(X,Y,Z, levels = 20)
 
 for i in range(20):
-    x_k, x_hist = SQP_GS(f, gI, tol = 1e-8, verbose = True)
+    x_k, x_hist, SP = SQP_GS(f, gI, gE, tol = 1e-8, verbose = True)
     print(x_k)
     plt.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 1)
 
 plt.xlim(-2,2)
 plt.ylim(-2,2)
-# x = np.zeros(2)
-# eps = 1
-# N = 1000
-# Y = sample_points(x, eps, N)
 
-# plt.scatter(Y[:,0], Y[:,1])
 
 #%%
 xsol1 = np.array([0.7071067,  0.49999994])
@@ -524,33 +527,33 @@ f.eval(xsol1)
 
 
 #%%
-dim = 10
-nI = 3
-nE = 2
-p0 = 4
-pI = 5*np.ones(nI, dtype = int)
-pE = 2*np.ones(nE, dtype = int)
+# dim = 10
+# nI = 3
+# nE = 2
+# p0 = 4
+# pI = 5*np.ones(nI, dtype = int)
+# pE = 2*np.ones(nE, dtype = int)
 
-H = np.eye(dim)
-rho = 0.1
+# H = np.eye(dim)
+# rho = 0.1
 
-D_f = np.random.rand(p0+1, dim)
-D_gI = [np.random.rand(pI[j]+1, dim) for j in range(nI)]
-D_gE = [np.random.rand(pE[j]+1, dim) for j in range(nE)]
+# D_f = np.random.rand(p0+1, dim)
+# D_gI = [np.random.rand(pI[j]+1, dim) for j in range(nI)]
+# D_gE = [np.random.rand(pE[j]+1, dim) for j in range(nE)]
 
-f_k = np.random.rand(1)
-gI_k = np.random.rand(nI)
-gE_k = np.random.rand(nE)
-
-
-SP = Subproblem(dim, nI, nE, p0, pI, pE)
+# f_k = np.random.rand(1)
+# gI_k = np.random.rand(nI)
+# gE_k = np.random.rand(nE)
 
 
-SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
-
-inG = SP.inG
+# SP = Subproblem(dim, nI, nE, p0, pI, pE)
 
 
-SP.solve()    
+# SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
 
-d=SP.d
+# inG = SP.inG
+
+
+# SP.solve()    
+
+# d_k=SP.d
