@@ -384,6 +384,22 @@ class Subproblem:
         
     
     def solve(self):
+        """
+        This solves the quadratic program. In every iteration, you should call self.update() before solving in order to have the correct subproblem data.
+        
+        self.d: array
+            search direction
+            
+        self.lambda_f: array
+            KKT multipier for objective.
+            
+        self.lambda_gE: list
+            KKT multipier for equality constraints. 
+        
+        self.lambda_gI: list
+            KKT multipier for inequality constraints.    
+
+        """
         cx.solvers.options['show_progress'] = False
         
         iG = np.vstack((self.inG, self.nonnegG))
@@ -434,7 +450,23 @@ class Subproblem:
         
         
     def initialize(self):
-
+        """
+        The quadratic subrpoblem we solve in every iteration is of the form:
+        
+        min_y 1/2* yPy + q*y subject to Gy <= h
+        
+        variable structure: y=(d,z,rI,rE) with
+        d = search direction
+        z = helper variable for objective
+        rI = helper variable for inequality constraints
+        rI = helper variable for equality constraints
+        
+        This function initializes the variables P,q,G,h. The entries which change in every iteration are then updated in self.update()
+        
+        G and h consist of two parts:
+            1) inG, inh: the inequalities from the paper
+            2) nonnegG, nonnegh: nonnegativity bounds rI >= 0, rE >= 0
+        """
         
         dimQP = self.dim+1+self.nI+self.nE
         
@@ -464,7 +496,32 @@ class Subproblem:
 
 
     def update(self, H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k):
+        """
+
+        Parameters
+        ----------
+        H : array
+            Hessian approximation
+        rho : float
+            parameter
+        D_f : array
+            gradient of f at the sampled points
+        D_gI : list
+            j-th element is the gradient array of c^j at the sampled points.
+        D_gE : list
+            j-th element is the gradient array of h^j at the sampled points.
+        f_k : float
+            evaluation of f at x_k.
+        gI_k : array
+            evaluation of inequality constraints at x_k.
+        gE_k : array
+            evaluation of equality constraints at x_k.
         
+        Returns
+        -------
+        None.
+
+        """
         self.P[:self.dim, :self.dim] = H
         self.q = np.hstack((np.zeros(self.dim), rho, np.ones(self.nI), np.ones(self.nE))) 
         
@@ -492,7 +549,7 @@ g = gtest()
 #D = Net(model)
 
 gI=[g]
-gE = [g]
+gE = []
 
 X, Y = np.meshgrid(np.linspace(-2,2,100), np.linspace(-2,2,100))
 Z = np.zeros_like(X)
@@ -506,7 +563,7 @@ plt.figure()
 plt.contourf(X,Y,Z, levels = 20)
 
 for i in range(20):
-    x_k, x_hist, SP = SQP_GS(f, gI, gE, tol = 1e-8, verbose = True)
+    x_k, x_hist, SP = SQP_GS(f, gI, gE, tol = 1e-8, verbose = False)
     print(x_k)
     plt.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 1)
 
