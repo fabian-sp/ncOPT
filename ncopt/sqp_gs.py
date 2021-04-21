@@ -4,7 +4,10 @@ import cvxopt as cx
 import torch
 
 from scipy.linalg import block_diag
-    
+
+
+# some test comment
+
 def sample_points(x, eps, N):
     """
     sample N points uniformly distributed in eps-ball around x
