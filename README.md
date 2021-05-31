@@ -19,7 +19,6 @@ The code was tested for a 2-dim nonsmooth version of the Rosenbrock function, co
 
 To reproduce this experiment, see the file `test_rosenbrock.py`.
 
-Inline-style: 
 ![SQP-GS trajectories for a 2-dim example](rosenbrock.png "SQP-GS trajectories for a 2-dim example")
 
 
