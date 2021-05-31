@@ -1,8 +1,12 @@
+"""
+author: Fabian Schaipp
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 
 from ncopt.sqpgs import SQP_GS
-from ncopt.rosenbrock import ftest, gtest, Net
+from ncopt.rosenbrock import ftest, gtest
+#from ncopt.torch_obj import Net
 
 #%%
 f = ftest()
