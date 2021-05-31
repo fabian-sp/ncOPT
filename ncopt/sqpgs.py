@@ -74,7 +74,9 @@ def compute_gradients(fun, X):
             
     return D   
 
-def SQP_GS(f, gI, gE, tol = 1e-8, verbose = True):
+assert_tol = 1e-5
+
+def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
     
     eps = 1e-1
     rho = 1e-1
@@ -104,7 +106,6 @@ def SQP_GS(f, gI, gE, tol = 1e-8, verbose = True):
     x_k = 2*np.random.randn(dim)
     iter_H = 10
     E_k = np.inf
-    max_iter = 100
     
     x_hist = list()
     x_kmin1 = None; g_kmin1 = None;
@@ -184,8 +185,8 @@ def SQP_GS(f, gI, gE, tol = 1e-8, verbose = True):
         
         delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE) 
         
-        assert delta_q >= -1e-5
-        assert np.abs(SP.lambda_f.sum() - rho) <= 1e-6, f"{np.abs(SP.lambda_f.sum() - rho)}"
+        assert delta_q >= -assert_tol
+        assert np.abs(SP.lambda_f.sum() - rho) <= assert_tol, f"{np.abs(SP.lambda_f.sum() - rho)}"
         
 
         if verbose:
