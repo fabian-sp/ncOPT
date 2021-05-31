@@ -1,9 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import cvxopt as cx
-import torch
 
-from scipy.linalg import block_diag
     
 def sample_points(x, eps, N):
     """
@@ -18,101 +15,6 @@ def sample_points(x, eps, N):
     
     return x + Z
 
-class ftest:
-    
-    def __init__(self, w = 8):
-        self.name = 'rosenbrock'
-        self.dim = 2
-        self.w = w
-        
-    def eval(self, x):
-        
-        return self.w*np.abs(x[0]**2-x[1]) + (1-x[0])**2
-    
-    def differentiable(self, x):
-        return np.abs(x[0]**2 - x[1]) > 1e-10
-    
-    def grad(self, x):
-        a = np.array([-2+x[0], 0])
-        
-        sign = np.sign(x[0]**2 -x[1])
-        
-        if sign == 1:
-            b = np.array([2*x[0], -1])
-        elif sign == -1:
-            b = np.array([-2*x[0], 1])
-        else:
-            b = np.array([-2*x[0], 1])
-         
-        #b = np.sign(x[0]**2 -x[1]) * np.array([2*x[0], -1])
-        
-        return a + b
-    
-class gtest:
-    
-    def __init__(self, c1 = np.sqrt(2), c2 = 2.):
-        self.name = 'max'        
-        self.c1 = c1
-        self.c2 = c2
-        return
-    
-    def eval(self, x):
-        return np.maximum(self.c1*x[0], self.c2*x[1]) - 1
-    
-    def differentiable(self, x):
-        return np.abs(self.c1*x[0] -self.c2*x[1]) > 1e-10
-    
-    def grad(self, x):
-        
-        sign = np.sign(self.c1*x[0] - self.c2*x[1])
-        if sign == 1:
-            g = np.array([self.c1, 0])
-        elif sign == -1:
-            g = np.array([0, self.c2])
-        else:
-            g = np.array([0, self.c2])
-        return g
-    
-
-class Net:
-    def __init__(self, D):
-        self.name = 'pytorchNN'
-        self.D = D
-        
-        self.D.zero_grad()
-        
-        self.dimIn = self.D[0].weight.shape[1]
-        
-        # set mode to evaluation
-        self.D.train(False)
-        
-        if type(self.D[-1]) == torch.nn.ReLU:
-            self.dimOut = self.D[-2].weight.shape[0]
-        else:
-            self.dimOut = self.D[-1].weight.shape[0]
- 
-        return
-    
-    def eval(self, x):      
-        assert len(x) == self.dimIn, f"Input for NN has wrong dimension, required dimension is {self.dimIn}."
-        
-        return self.D.forward(torch.tensor(x, dtype=torch.float32)).detach().numpy()
-    
-    def grad(self, x):
-        assert len(x) == self.dimIn, f"Input for NN has wrong dimension, required dimension is {self.dimIn}."
-        
-        x_torch = torch.tensor(x, dtype=torch.float32)
-        x_torch.requires_grad_(True)
-        
-        y_torch = self.D(x_torch)
-        y_torch.backward()
-
-        return x_torch.grad.data.numpy()
-          
-        
-        
-
-#%%
 
 def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):
     term1 = rho* (f_k + np.max(D_f @ d))
@@ -543,74 +445,5 @@ class Subproblem:
        
         return        
     
-#%%
-f = ftest()
-g = gtest()
-#D = Net(model)
-
-gI=[g]
-gE = []
-
-X, Y = np.meshgrid(np.linspace(-2,2,100), np.linspace(-2,2,100))
-Z = np.zeros_like(X)
-
-for j in np.arange(100):
-    for i in np.arange(100):
-        Z[i,j] = f.eval(np.array([X[i,j], Y[i,j]]))
 
 
-plt.figure()
-plt.contourf(X,Y,Z, levels = 20)
-
-for i in range(20):
-    x_k, x_hist, SP = SQP_GS(f, gI, gE, tol = 1e-8, verbose = False)
-    print(x_k)
-    plt.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 1)
-
-plt.xlim(-2,2)
-plt.ylim(-2,2)
-
-
-#%%
-xsol1 = np.array([0.7071067,  0.49999994])
-xsol2 = np.array([0.64982465, 0.42226049])
-f.eval(xsol2)
-g.eval(xsol2)
-f.eval(xsol1)
-#D.eval(xsol1)
-
-
-
-
-
-#%%
-# dim = 10
-# nI = 3
-# nE = 2
-# p0 = 4
-# pI = 5*np.ones(nI, dtype = int)
-# pE = 2*np.ones(nE, dtype = int)
-
-# H = np.eye(dim)
-# rho = 0.1
-
-# D_f = np.random.rand(p0+1, dim)
-# D_gI = [np.random.rand(pI[j]+1, dim) for j in range(nI)]
-# D_gE = [np.random.rand(pE[j]+1, dim) for j in range(nE)]
-
-# f_k = np.random.rand(1)
-# gI_k = np.random.rand(nI)
-# gE_k = np.random.rand(nE)
-
-
-# SP = Subproblem(dim, nI, nE, p0, pI, pE)
-
-
-# SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
-
-# inG = SP.inG
-
-
-# SP.solve()    
-
-# d_k=SP.d

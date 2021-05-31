@@ -1,5 +1,12 @@
+"""
+Script for training a NN representing the function
+
+x \mapsto max(c1*x[0], c2*x[1]) - 1
+
+The net can be used as a constraint for SQP GS
+"""
+
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import StepLR
@@ -19,7 +26,7 @@ def generate_data(N):
     
     return X0,X1
 
-X0,X1 = generate_data(500)
+X0,X1 = generate_data(200)
 Z = g(X0,X1)
 
 
@@ -83,21 +90,15 @@ for epoch in range(N_EPOCHS):
     
         # Compute and print loss.
         loss = loss_fn(y_pred.squeeze(), z_batch)
-        
-            
-        # Before the backward pass, use the optimizer object to zero all of the
-        # gradients for the variables it will update (which are the learnable
-        # weights of the model). This is because by default, gradients are
-        # accumulated in buffers( i.e, not overwritten) whenever .backward()
-        # is called. Checkout docs of torch.autograd.backward for more details.
+               
+        # zero gradients
         optimizer.zero_grad()
     
         # Backward pass: compute gradient of the loss with respect to model
         # parameters
         loss.backward()
     
-        # Calling the step function on an Optimizer makes an update to its
-        # parameters
+        # iteration
         optimizer.step()
 
     print(loss.item())
@@ -108,7 +109,7 @@ for epoch in range(N_EPOCHS):
 
 optimizer.zero_grad()       
     
-#%%
+#%% plot results
 
 N_test = 200
 X0_test,X1_test = generate_data(N_test)
@@ -142,8 +143,6 @@ ax.plot_surface(X0_test, X1_test, Z_test_arr, cmap=plt.cm.coolwarm, linewidth=0,
 #%% test auto-diff gradient
 
 x0 = torch.tensor([np.sqrt(2),0.5], dtype = torch.float32)
-x0 = torch.tensor([np.sqrt(2),1.0], dtype = torch.float32)
-x0 = torch.tensor([np.sqrt(2),2.0], dtype = torch.float32)
 
 x0.requires_grad_(True)
 model.zero_grad()
@@ -156,26 +155,26 @@ x0.grad.data
 W = model[-1].weight.detach().numpy()
 
 #%%
-G_test = torch.zeros((X_test.shape))
+# G_test = torch.zeros((X_test.shape))
 
-for j in range(len(X_test)):
-    x0 = X_test[j]
-    x0.requires_grad_(True)
+# for j in range(len(X_test)):
+#     x0 = X_test[j]
+#     x0.requires_grad_(True)
     
-    #model.zero_grad()
+#     #model.zero_grad()
 
-    y0 = model(x0)
-    y0.backward()
+#     y0 = model(x0)
+#     y0.backward()
 
-    G_test[j] = x0.grad.data
+#     G_test[j] = x0.grad.data
 
-from mpl_toolkits.mplot3d import Axes3D
-fig = plt.figure()
-ax = fig.gca(projection='3d')
+# from mpl_toolkits.mplot3d import Axes3D
+# fig = plt.figure()
+# ax = fig.gca(projection='3d')
 
-# Plot the surface.
-G_test_arr = np.linalg.norm(G_test.numpy(), axis = 1).reshape(N_test, N_test)
-ax.plot_surface(X0_test, X1_test, G_test_arr, cmap=plt.cm.coolwarm, linewidth=0, antialiased=False)
+# # Plot the surface.
+# G_test_arr = np.linalg.norm(G_test.numpy(), axis = 1).reshape(N_test, N_test)
+# ax.plot_surface(X0_test, X1_test, G_test_arr, cmap=plt.cm.coolwarm, linewidth=0, antialiased=False)
 
 
 
