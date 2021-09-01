@@ -3,11 +3,12 @@ author: Fabian Schaipp
 """
 import numpy as np
 
-class ftest:
+class f_rosenbrock:
     
     def __init__(self, w = 8):
         self.name = 'rosenbrock'
         self.dim = 2
+        self.dimOut = 1
         self.w = w
         
     def eval(self, x):
@@ -33,12 +34,13 @@ class ftest:
         
         return a + b
     
-class gtest:
+class g_max:
     
     def __init__(self, c1 = np.sqrt(2), c2 = 2.):
         self.name = 'max'        
         self.c1 = c1
         self.c2 = c2
+        self.dimOut = 1
         return
     
     def eval(self, x):
@@ -57,5 +59,22 @@ class gtest:
         else:
             g = np.array([0, self.c2])
         return g
+
+class g_upper_bound:
+    
+    def __init__(self, lhs = 5.):
+        self.name = 'upper bound' 
+        self.lhs = lhs
+        self.dimOut = 2
+        return
+    
+    def eval(self, x):
+        return x - self.lhs
+    
+    def differentiable(self, x):
+        return True
+    
+    def grad(self, x):
+        return np.eye(len(x))
     
 

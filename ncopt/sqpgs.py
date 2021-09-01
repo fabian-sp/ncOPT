@@ -37,12 +37,20 @@ def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):
 def phi_rho(x, f, gI, gE, rho):
     term1 = rho*f.eval(x)
     
-    term2 = np.sum([np.maximum(gI[j].eval(x), 0) for j in range(len(gI))])
-    term3 = np.sum([np.abs(gE[l].eval(x)) for l in range(len(gE))])
-    
+    # inequalities
+    if len(gI) > 0:
+        term2 = np.sum(np.hstack([np.maximum(gI[j].eval(x), 0) for j in range(len(gI))]))
+    else:
+        term2 = 0
+    # equalities: max(x,0) + max(-x,0) = abs(x)
+    if len(gE) > 0:
+        term3 = np.sum(np.hstack([np.abs(gE[l].eval(x)) for l in range(len(gE))]))
+    else:
+        term3 = 0
+        
     return term1+term2+term3
 
-def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI, nE, pI, pE):
+def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE):
     
     val1 = np.linalg.norm(g_k, np.inf)
     
@@ -50,46 +58,114 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI, nE, pI, pE):
     val2 = np.max(gI_k, initial = -np.inf)
     val3 = np.max(np.abs(gE_k), initial = -np.inf)
     
-    gI_vals = [np.array([gI[j].eval(B_gI[j][i,:]) for i in np.arange(pI[j]+1)]) for j in np.arange(nI)]
+    gI_vals = list()
+    for j in np.arange(nI_):
+        gI_vals += eval_ineq(gI[j], B_gI[j])
+    
     val4 = -np.inf
-    for j in np.arange(nI):
+    for j in np.arange(len(gI_vals)):
         val4 = np.maximum(val4, np.max(SP.lambda_gI[j] * gI_vals[j]))
     
-    gE_vals = [np.array([gE[j].eval(B_gE[j][i,:]) for i in np.arange(pE[j]+1)]) for j in np.arange(nE)]
+    gE_vals = list()
+    for j in np.arange(nE_):
+        gE_vals += eval_ineq(gE[j], B_gE[j])
+    
     val5 = -np.inf
-    for j in np.arange(nE):
+    for j in np.arange(len(gE_vals)):
         val5 = np.maximum(val5, np.max(SP.lambda_gE[j] * gE_vals[j]))
     
     return np.max(np.array([val1, val2, val3, val4, val5]))
- 
+
+def eval_ineq(fun, X):
+    """
+    evaluate function at multiple inputs
+    needed in stop_criterion
+    
+    Returns
+    -------
+    list of array, number of entries = fun.dimOut 
+    """
+    (N, _) = X.shape
+    D = np.zeros((N, fun.dimOut))
+    for i in np.arange(N):
+        D[i,:,] = fun.eval(X[i,:])
+    
+    return [D[:,j] for j in range(fun.dimOut)]
+
 
 def compute_gradients(fun, X):
     """ computes gradients of function object f at all rows of array X
+    returns: list of 2d-matrices, length of fun.dimOut
     """
     (N, dim) = X.shape
-        
-    D = np.zeros(X.shape)
-    for i in np.arange(N):
-        D[i,:] = fun.grad(X[i,:])
-            
-    return D   
-
-assert_tol = 1e-5
-
-def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
     
+    # fun.grad returns Jacobian, i.e. dimOut x dim
+    D = np.zeros((N, fun.dimOut, dim))
+    for i in np.arange(N):
+        D[i,:,:] = fun.grad(X[i,:])
+    
+    D_list = list()
+    for j in np.arange(fun.dimOut):
+        D_list.append(D[:,j,:])
+    
+    return D_list   
+
+
+
+def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, assert_tol = 1e-5):
+    """
+    each element of gI, gE needs attribute g.dimOut 
+
+    Parameters
+    ----------
+    f : TYPE
+        DESCRIPTION.
+    gI : TYPE
+        DESCRIPTION.
+    gE : TYPE
+        DESCRIPTION.
+    x0: array
+        Starting point. The default is zero.
+    tol : TYPE, optional
+        DESCRIPTION. The default is 1e-8.
+    max_iter : TYPE, optional
+        DESCRIPTION. The default is 100.
+    verbose : TYPE, optional
+        DESCRIPTION. The default is True.
+
+    Returns
+    -------
+    x_k : TYPE
+        DESCRIPTION.
+    x_hist : TYPE
+        DESCRIPTION.
+    SP : TYPE
+        DESCRIPTION.
+
+    """
     eps = 1e-1
     rho = 1e-1
     theta = 1e-1
     
+    # extract dimensions of constraints
     dim = f.dim
-    nI = len(gI)
-    nE = len(gE)
+    dimI = np.array([g.dimOut for g in gI], dtype = int)
+    dimE = np.array([g.dimOut for g in gE], dtype = int)
     
-    p0 = 2 
-    pI = 3 *np.ones(nI, dtype = int)
-    pE = 4 *np.ones(nE, dtype = int)
     
+    nI_ = len(gI) # number of inequality function objects
+    nE_ = len(gE) # number of equality function objects
+    
+    nI = sum(dimI) # number of inequality costraints
+    nE = sum(dimE) # number of equality costraints
+    
+    p0 = 2 # sample points for objective
+    pI_ = 3 * np.ones(nI_, dtype = int) # sample points for ineq constraint
+    pE_ = 4 * np.ones(nE_, dtype = int) # sample points for eq constraint
+        
+    pI = np.repeat(pI_, dimI)
+    pE = np.repeat(pE_, dimE)
+       
     eta = 1e-8
     gamma = 0.5
     beta_eps = 0.5
@@ -103,11 +179,15 @@ def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
     # initialize subproblem object
     SP = Subproblem(dim, nI, nE, p0, pI, pE)
     
-    x_k = 2*np.random.randn(dim)
+    if x0 is None:
+        x_k = np.zeros(dim)
+    else:
+        x_k = x0.copy()
+        
     iter_H = 10
     E_k = np.inf
     
-    x_hist = list()
+    x_hist = [x_k]
     x_kmin1 = None; g_kmin1 = None;
     s_hist = np.zeros((dim, iter_H))
     y_hist = np.zeros((dim, iter_H))
@@ -116,10 +196,10 @@ def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
     
     status = 'not optimal'; step = np.nan
     
-    hdr_fmt = "%4s\t%10s\t%5s\t%5s\t%10s"
-    out_fmt = "%4d\t%10.4g\t%10.4g\t%10.4g\t%10.4g"
+    hdr_fmt = "%4s\t%10s\t%5s\t%5s\t%10s\t%10s"
+    out_fmt = "%4d\t%10.4g\t%10.4g\t%10.4g\t%10.4g\t%10s"
     if verbose:
-        print(hdr_fmt % ("iter", "f(x_k)", "max(g_j(x_k))", "E_k", "step"))
+        print(hdr_fmt % ("iter", "f(x_k)", "max(g_j(x_k))", "E_k", "step", "subproblem status"))
     
     ##############################################
     # START OF LOOP
@@ -138,31 +218,39 @@ def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
         B_f = np.vstack((x_k, B_f))
         
         B_gI = list()
-        for j in np.arange(nI):
-            B_j = sample_points(x_k, eps, pI[j])
+        for j in np.arange(nI_):
+            B_j = sample_points(x_k, eps, pI_[j])
             B_j = np.vstack((x_k, B_j))
             B_gI.append(B_j)
             
         B_gE = list()
-        for j in np.arange(nE):
-            B_j = sample_points(x_k, eps, pE[j])
+        for j in np.arange(nE_):
+            B_j = sample_points(x_k, eps, pE_[j])
             B_j = np.vstack((x_k, B_j))
             B_gE.append(B_j)
             
         # compute gradients for objective+inequality+equality constraints
-        D_f = compute_gradients(f, B_f) 
+        D_f = compute_gradients(f, B_f)[0] # returns list, always has one element
         
         D_gI = list()
-        for j in np.arange(nI):
-            D_gI.append(compute_gradients(gI[j], B_gI[j]))
- 
+        for j in np.arange(nI_):
+            D_gI += compute_gradients(gI[j], B_gI[j])
+            
         D_gE = list()
-        for j in np.arange(nE):
-            D_gE.append(compute_gradients(gE[j], B_gE[j]))
+        for j in np.arange(nE_):
+            D_gE += compute_gradients(gE[j], B_gE[j])
  
         f_k = f.eval(x_k)
-        gI_k = np.array([gI[j].eval(x_k) for j in range(nI)])
-        gE_k = np.array([gE[j].eval(x_k) for j in range(nE)])
+        # hstack cannot handle empty lists!
+        if nI_ > 0:
+            gI_k = np.hstack([gI[j].eval(x_k) for j in range(nI_)])
+        else:
+            gI_k = np.array([])
+        
+        if nE_ > 0:
+            gE_k = np.hstack([gE[j].eval(x_k) for j in range(nE_)])
+        else:
+            gE_k = np.array([])
         
         ##############################################
         # SUBPROBLEM
@@ -190,9 +278,9 @@ def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
         
 
         if verbose:
-            print(out_fmt % (iter_k, f_k, np.max(gI_k), E_k, step))
+            print(out_fmt % (iter_k, f_k, np.max(np.hstack((gI_k,gE_k))), E_k, step, SP.status))
         
-        new_E_k = stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI, nE, pI, pE)
+        new_E_k = stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE)
         E_k = min(E_k, new_E_k)
         ##############################################
         # STEP
@@ -262,7 +350,7 @@ def SQP_GS(f, gI, gE, tol = 1e-8, max_iter = 100, verbose = True):
     if E_k > tol:
         status = 'max iterations reached'
     
-    print(f"SQP GS terminate with status {status}")
+    print(f"SQP-GS has terminated with status {status}")
     
     return x_k, x_hist, SP
 
@@ -278,6 +366,8 @@ class Subproblem:
         pI : array, number of sample points for inequality constraint (excluding x_k itself)
         pE : array, number of sample points for equality constraint (excluding x_k itself)
         """
+        assert len(pI) == nI
+        assert len(pE) == nE
         
         self.dim = dim
         self.nI = nI
@@ -313,6 +403,7 @@ class Subproblem:
         
         qp = cx.solvers.qp(P = cx.matrix(self.P), q = cx.matrix(self.q), G = cx.matrix(iG), h = cx.matrix(ih))
         
+        self.status = qp["status"]
         self.cvx_sol_x = np.array(qp['x']).squeeze()
         
         self.d = self.cvx_sol_x[:self.dim]
