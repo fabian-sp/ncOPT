@@ -29,7 +29,7 @@ The solver has three main arguments, called `f`, `gI` and `gE`. The first is the
 ### Attributes
 
 * `self.dim`: integer, specifies dimension of the input argument.
-* `self.dim`: integer, specifies dimension of the output.
+* `self.dimOut`: integer, specifies dimension of the output.
 
 ### Methods
 
