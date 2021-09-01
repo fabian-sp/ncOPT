@@ -14,7 +14,7 @@ g = g_max()
 g1 = g_upper_bound(lhs=5)
 #D = Net(model)
 
-# inequality constraints (list of scalar functions)
+# inequality constraints (list of functions)
 gI = [g,g1]
 # equality constraints (list of scalar functions)
 gE = []
