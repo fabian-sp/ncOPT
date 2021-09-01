@@ -3,10 +3,12 @@ author: Fabian Schaipp
 """
 
 import numpy as np
-import os
+import sys, os
 
+tests_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, tests_path + '/../..')
 
-os.chdir('../..')
+#os.chdir('../..')
 
 from ncopt.sqpgs import SQP_GS
 from ncopt.funs import f_rosenbrock, g_max, g_upper_bound
