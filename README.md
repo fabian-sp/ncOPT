@@ -40,6 +40,7 @@ For an example, see the classes defined in `ncopt/funs.py`.
 Moreover, we implemented a class for a constraint coming from a Pytorch neural network (i.e. `g_i(x)` is an already trained neural network). For this, see `ncopt/torch_obj.py`.
 
 
+
 ## References
 * [1] F. E. Curtis and M. L. Overton, A sequential quadratic programming algorithm for nonconvex, nonsmooth constrained optimization, SIAM Journal on Optimization, 22 (2012), pp. 474–500, https://doi.org/10.1137/090780201.
 
