@@ -1,9 +1,11 @@
 """
 author: Fabian Schaipp
+
+Notation is (wherever possible) inspired by Curtis, Overton "SQP FOR NONSMOOTH CONSTRAINED OPTIMIZATION"
 """
+
 import numpy as np
 import cvxopt as cx
-
     
 def sample_points(x, eps, N):
     """
@@ -12,8 +14,7 @@ def sample_points(x, eps, N):
     dim = len(x)
     U = np.random.randn(N, dim)
     norm_U = np.linalg.norm(U, axis = 1)
-    R = np.random.rand(N)**(1/dim)
-    
+    R = np.random.rand(N)**(1/dim)    
     Z = eps * (R/norm_U)[:,np.newaxis] * U
     
     return x + Z
@@ -51,7 +52,9 @@ def phi_rho(x, f, gI, gE, rho):
     return term1+term2+term3
 
 def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE):
-    
+    """
+    computes E_k in the paper
+    """
     val1 = np.linalg.norm(g_k, np.inf)
     
     # as gI or gE could be empty, we need a max value for empty arrays --> initial argument
@@ -94,8 +97,12 @@ def eval_ineq(fun, X):
 
 
 def compute_gradients(fun, X):
-    """ computes gradients of function object f at all rows of array X
-    returns: list of 2d-matrices, length of fun.dimOut
+    """ 
+    computes gradients of function object f at all rows of array X
+    
+    Returns
+    -------
+    list of 2d-matrices, length of fun.dimOut
     """
     (N, dim) = X.shape
     
@@ -143,7 +150,7 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
         DESCRIPTION.
 
     """
-    eps = 1e-1
+    eps = 1e-1 # sampling radius
     rho = 1e-1
     theta = 1e-1
     
@@ -159,13 +166,14 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
     nI = sum(dimI) # number of inequality costraints
     nE = sum(dimE) # number of equality costraints
     
-    p0 = 2 # sample points for objective
+    p0 = 2                              # sample points for objective
     pI_ = 3 * np.ones(nI_, dtype = int) # sample points for ineq constraint
     pE_ = 4 * np.ones(nE_, dtype = int) # sample points for eq constraint
         
     pI = np.repeat(pI_, dimI)
     pE = np.repeat(pE_, dimE)
-       
+      
+    # parameters (set after recommendations in paper)
     eta = 1e-8
     gamma = 0.5
     beta_eps = 0.5
@@ -229,7 +237,10 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
             B_j = np.vstack((x_k, B_j))
             B_gE.append(B_j)
             
-        # compute gradients for objective+inequality+equality constraints
+            
+        ####################################
+        # COMPUTE GRADIENTS AND EVALUATE
+        ###################################
         D_f = compute_gradients(f, B_f)[0] # returns list, always has one element
         
         D_gI = list()
@@ -258,33 +269,32 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
         #print("H EIGVALS", np.linalg.eigh(H)[0])
 
         SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
-        
         SP.solve()
         
         d_k = SP.d.copy()
         # compute g_k from paper 
         g_k = SP.lambda_f @ D_f + np.sum([SP.lambda_gI[j] @ D_gI[j] for j in range(nI)], axis = 0)  \
                              +  np.sum([SP.lambda_gE[j] @ D_gE[j] for j in range(nE)], axis = 0)
-                                
-        
+                                  
         # evaluate v(x) at x=x_k
         v_k = np.maximum(gI_k, 0).sum() + np.sum(np.abs(gE_k))
-        phi_k = rho*f_k + v_k
-        
+        phi_k = rho*f_k + v_k  
         delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE) 
         
         assert delta_q >= -assert_tol
         assert np.abs(SP.lambda_f.sum() - rho) <= assert_tol, f"{np.abs(SP.lambda_f.sum() - rho)}"
         
-
+        
         if verbose:
             print(out_fmt % (iter_k, f_k, np.max(np.hstack((gI_k,gE_k))), E_k, step, SP.status))
         
         new_E_k = stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE)
         E_k = min(E_k, new_E_k)
+        
         ##############################################
         # STEP
         ##############################################
+        
         step = delta_q > nu*eps**2 
         if step:
             alpha = 1.
@@ -465,29 +475,27 @@ class Subproblem:
             2) nonnegG, nonnegh: nonnegativity bounds rI >= 0, rE >= 0
         """
         
-        dimQP = self.dim+1+self.nI+self.nE
+        dimQP = self.dim+1 + self.nI + self.nE
         
-        P = np.zeros((dimQP,dimQP))
+        P = np.zeros((dimQP, dimQP))
         q = np.zeros(dimQP)
         
-        inG = np.zeros((1+self.p0+np.sum(1+self.pI)+2*np.sum(1+self.pE),dimQP))
-        inh = np.zeros(1+self.p0+np.sum(1+self.pI)+2*np.sum(1+self.pE))
+        inG = np.zeros((1 + self.p0+np.sum(1+self.pI) + 2*np.sum(1+self.pE), dimQP))
+        inh = np.zeros( 1 + self.p0+np.sum(1+self.pI) + 2*np.sum(1+self.pE))
         
         # structure of inG (p0+1, sum(1+pI), sum(1+pE), sum(1+pE))
         inG[:self.p0+1, self.dim] = -1
         
         for j in range(self.nI):
-            inG[self.p0+1+(1+self.pI)[:j].sum()         :  self.p0+1+(1+self.pI)[:j].sum()         + self.pI[j]+1, self.dim+1+j]    = -1
-            
+            inG[self.p0+1+(1+self.pI)[:j].sum()                                     :  self.p0+1+(1+self.pI)[:j].sum()                                      + self.pI[j]+1, self.dim+1+j]         = -1
             
         for j in range(self.nE):
-            inG[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()  :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()     + self.pE[j]+1, self.dim+1+self.nI+j] = -1
-            inG[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1, self.dim+1+self.nI+j] = -1
+            inG[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                   :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                    + self.pE[j]+1, self.dim+1+self.nI+j] = -1
+            inG[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum()  + self.pE[j]+1, self.dim+1+self.nI+j] = -1
             
-        
         # we have nI+nE r-variables
-        nonnegG = np.hstack((np.zeros((self.nI+self.nE,self.dim+1)), -np.eye(self.nI+self.nE)))
-        nonnegh = np.zeros(self.nI+self.nE)
+        nonnegG = np.hstack((np.zeros((self.nI + self.nE, self.dim + 1)), -np.eye(self.nI + self.nE)))
+        nonnegh = np.zeros(self.nI + self.nE)
      
         return P,q,inG,inh,nonnegG,nonnegh
 
@@ -522,20 +530,19 @@ class Subproblem:
         self.P[:self.dim, :self.dim] = H
         self.q = np.hstack((np.zeros(self.dim), rho, np.ones(self.nI), np.ones(self.nE))) 
         
-        
-        self.inG[:self.p0+1, :self.dim] = D_f
-        self.inh[:self.p0+1] = -f_k
+        self.inG[:self.p0+1, :self.dim] =  D_f
+        self.inh[:self.p0+1]            = -f_k
         
         for j in range(self.nI):
-            self.inG[self.p0+1+(1+self.pI)[:j].sum()        :  self.p0+1+(1+self.pI)[:j].sum()        + self.pI[j]+1, :self.dim]    = D_gI[j]
-            self.inh[self.p0+1+(1+self.pI)[:j].sum()        :  self.p0+1+(1+self.pI)[:j].sum()        + self.pI[j]+1]          = -gI_k[j] 
+            self.inG[self.p0+1+(1+self.pI)[:j].sum()        :  self.p0+1+(1+self.pI)[:j].sum()        + self.pI[j]+1, :self.dim]    =  D_gI[j]
+            self.inh[self.p0+1+(1+self.pI)[:j].sum()        :  self.p0+1+(1+self.pI)[:j].sum()        + self.pI[j]+1]               = -gI_k[j] 
             
         for j in range(self.nE):
-            self.inG[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()              :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()              + self.pE[j]+1, :self.dim] = D_gE[j]
-            self.inG[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1, :self.dim] = -D_gE[j]
+            self.inG[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                   :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                   + self.pE[j]+1, :self.dim]  =  D_gE[j]
+            self.inG[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1, :self.dim]  = -D_gE[j]
             
-            self.inh[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()              :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()              + self.pE[j]+1] = -gE_k[j]
-            self.inh[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1] = gE_k[j]
+            self.inh[self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                   :  self.p0+1+(1+self.pI).sum()+(1+self.pE)[:j].sum()                   + self.pE[j]+1]             = -gE_k[j]
+            self.inh[self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() :  self.p0+1+(1+self.pI).sum()+(1+self.pE).sum()+(1+self.pE)[:j].sum() + self.pE[j]+1]             =  gE_k[j]
             
        
         return        
