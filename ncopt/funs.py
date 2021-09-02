@@ -1,28 +1,31 @@
 """
 author: Fabian Schaipp
 """
+
 import numpy as np
 
 class f_rosenbrock:
+    """
+    Nonsmooth Rosenbrock function (see 5.1 in Curtis, Overton "SQP FOR NONSMOOTH CONSTRAINED OPTIMIZATION")
     
+    x -> w|x_1^2 − x_2| + (1 − x_1)^2
+    """
     def __init__(self, w = 8):
         self.name = 'rosenbrock'
         self.dim = 2
         self.dimOut = 1
         self.w = w
         
-    def eval(self, x):
-        
+    def eval(self, x):    
         return self.w*np.abs(x[0]**2-x[1]) + (1-x[0])**2
     
     def differentiable(self, x):
         return np.abs(x[0]**2 - x[1]) > 1e-10
     
     def grad(self, x):
-        a = np.array([-2+x[0], 0])
-        
+        a = np.array([-2+x[0], 0])    
         sign = np.sign(x[0]**2 -x[1])
-        
+    
         if sign == 1:
             b = np.array([2*x[0], -1])
         elif sign == -1:
@@ -30,12 +33,15 @@ class f_rosenbrock:
         else:
             b = np.array([-2*x[0], 1])
          
-        #b = np.sign(x[0]**2 -x[1]) * np.array([2*x[0], -1])
-        
+        #b = np.sign(x[0]**2 -x[1]) * np.array([2*x[0], -1])       
         return a + b
     
 class g_max:
+    """
+    maximum function (see 5.1 in Curtis, Overton "SQP FOR NONSMOOTH CONSTRAINED OPTIMIZATION")
     
+    x -> max(c1*x_1, c2*x_2) - 1
+    """
     def __init__(self, c1 = np.sqrt(2), c2 = 2.):
         self.name = 'max'        
         self.c1 = c1
@@ -60,21 +66,27 @@ class g_max:
             g = np.array([0, self.c2])
         return g
 
-class g_upper_bound:
+class g_linear:
+    """
+    linear constraint:
     
-    def __init__(self, lhs = 5.):
-        self.name = 'upper bound' 
-        self.lhs = lhs
-        self.dimOut = 2
+    x -> Ax - b
+    """
+    def __init__(self, A, b):
+        self.name = 'linear' 
+        self.A = A
+        self.b = b
+        self.dim = A.shape[0]
+        self.dimOut = A.shape[1]
         return
     
     def eval(self, x):
-        return x - self.lhs
+        return self.A @ x - self.b
     
     def differentiable(self, x):
         return True
     
     def grad(self, x):
-        return np.eye(len(x))
+        return self.A
     
 

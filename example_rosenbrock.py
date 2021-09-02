@@ -5,13 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ncopt.sqpgs import SQP_GS
-from ncopt.funs import f_rosenbrock, g_max, g_upper_bound
+from ncopt.funs import f_rosenbrock, g_max, g_linear
 #from ncopt.torch_obj import Net
 
 #%%
 f = f_rosenbrock()
 g = g_max()
-g1 = g_upper_bound(lhs=5)
+
+A = np.eye(2); b = np.ones(2)*5; g1 = g_linear(A, b)
 #D = Net(model)
 
 # inequality constraints (list of functions)

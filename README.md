@@ -23,8 +23,11 @@ To reproduce this experiment, see the file `example_rosenbrock.py`.
 
 
 ## Implementation details
+The solver can be called via 
 
-The solver has three main arguments, called `f`, `gI` and `gE`. The first is the objective while the latter are lists of inequality and equality constraint functions. Each element of `gI` and `gE` can have a multidimensional output. Each element of `gI` and `gE` as well as the objective `f` needs to be an instance of a class which contains the following properties.
+    SQP_GS(f, gI, gE)
+
+It has three main arguments, called `f`, `gI` and `gE`. `f` is the objective. `gI` and `gE` are lists of inequality and equality constraint functions. Each element of `gI` and `gE` as well as the objective `f` needs to be an instance of a class which contains the following properties. The constraint functions are allowed to have multi-dimensional output.
 
 ### Attributes
 
@@ -34,9 +37,9 @@ The solver has three main arguments, called `f`, `gI` and `gE`. The first is the
 ### Methods
 
 * `self.eval`: evaluates the function at a point `x`.
-* `self.grad`: evaluates the gradient at a point `x`.
+* `self.grad`: evaluates the gradient at a point `x`. Here, the Jacobian must be returned, i.e. an array of shape `dimOut x dim`.
 
-For an example, see the classes defined in `ncopt/funs.py`. 
+For an example, see the classes defined in `ncopt/funs.py`.
 Moreover, we implemented a class for a constraint coming from a Pytorch neural network (i.e. `g_i(x)` is an already trained neural network). For this, see `ncopt/torch_obj.py`.
 
 
