@@ -1,9 +1,9 @@
 """
-Script for training a NN representing the function
+This is as rather experimental script for training a NN representing the function:
 
 x \mapsto max(c1*x[0], c2*x[1]) - 1
 
-The net can be used as a constraint for SQP GS
+The idea is to use a neural network as a constraint for SQP-GS.
 """
 
 import numpy as np
@@ -24,69 +24,73 @@ def generate_data(N):
     X0,X1 = np.meshgrid(x0,x1)
     return X0,X1
 
-X0,X1 = generate_data(200)
+X0, X1 = generate_data(200)
 Z = g(X0,X1)
-
 
 #%%
 
 tmp = np.stack((X0.reshape(-1),X1.reshape(-1))).T
 
 # pytorch weights are in torch.float32, numpy data is float64!
-x = torch.tensor(tmp, dtype = torch.float32)
-z = torch.tensor(Z.reshape(-1), dtype = torch.float32)
+tX = torch.tensor(tmp, dtype = torch.float32)
+tZ = torch.tensor(Z.reshape(-1), dtype = torch.float32)
 
-N = len(x)
+N = len(tX)
 
 #%%
-# D_in is input dimension;
-# H is hidden dimension; D_out is output dimension.
-D_in, H, D_out = 2, 200, 1
+# # D_in is input dimension;
+# # H is hidden dimension; D_out is output dimension.
 
-# define model and loss function.
-model = torch.nn.Sequential(
-    torch.nn.Linear(D_in, H),
-    torch.nn.ReLU(),
-    torch.nn.Linear(H, H),
-    torch.nn.ReLU(),
-    torch.nn.Linear(H, H),
-    torch.nn.ReLU(),
-    torch.nn.Linear(H, H),
-    torch.nn.ReLU(),
-    torch.nn.Linear(H, D_out),
-)
+# D_in, H, D_out = 2, 200, 1
+
+# # define model and loss function.
+# model = torch.nn.Sequential(
+#     torch.nn.Linear(D_in, H),
+#     torch.nn.ReLU(),
+#     torch.nn.Linear(H, H),
+#     torch.nn.ReLU(),
+#     torch.nn.Linear(H, H),
+#     torch.nn.ReLU(),
+#     torch.nn.Linear(H, H),
+#     torch.nn.ReLU(),
+#     torch.nn.Linear(H, D_out),
+# )
+
+# loss_fn = torch.nn.MSELoss(reduction='mean')
+
+#%%
+
+class myNN(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.l1 = torch.nn.Linear(2, 2) # layer 1
+        #self.l2 = torch.nn.Linear(20, 2) # layer 2
+        #self.relu = torch.nn.ReLU()
+        self.max = torch.max
+    def forward(self, x):
+        x = self.l1(x)
+        x,_ = self.max(x, dim = -1)
+        return x
 
 loss_fn = torch.nn.MSELoss(reduction='mean')
 
-#%%
+model = myNN()
 
-# class myNN(torch.nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.l1 = torch.nn.Linear(2, 2) # layer 1
-#         #self.l2 = torch.nn.Linear(20, 2) # layer 2
-#         #self.relu = torch.nn.ReLU()
-#         self.max = torch.max
-#     def forward(self, x):
-#         x = self.l1(x)
-#         #x = self.relu(x)
-#         #x = self.l2(x)
-#         x = self.max(x)
-#         return x
+# set weights manually
+#model.state_dict()["l1.weight"][:] = torch.diag(torch.tensor([c1,c2]))
+#model.state_dict()["l1.bias"][:] = -torch.ones(2)
 
+print(model.l1.weight)
+print(model.l1.bias)
 
-# model = myNN()
-# loss_fn = torch.nn.MSELoss(reduction='mean')
-
-# testing
-#x = torch.tensor([1.,2.])
-#model(x)
-
-#model.l1.weight
+#testing
+x = torch.tensor([1.,4.])
+model(x)
+g(x[0], x[1])
 
 #%%
 learning_rate = 1e-3
-N_EPOCHS = 10
+N_EPOCHS = 11
 b = 15
 
 #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -104,7 +108,7 @@ for epoch in range(N_EPOCHS):
     for t in range(int(N/b)):
         
         S = sample_batch(N, b)
-        x_batch = x[S]; z_batch = z[S]
+        x_batch = tX[S]; z_batch = tZ[S]
                 
         # forward pass
         y_pred = model.forward(x_batch)
@@ -120,6 +124,9 @@ for epoch in range(N_EPOCHS):
     
         # iteration
         optimizer.step()
+        
+    print(model.l1.weight)
+    print(model.l1.bias)
 
     print(loss.item())
     scheduler.step()
