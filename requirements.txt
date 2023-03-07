@@ -1,0 +1,2 @@
+numpy
+cvxopt>=1.2.0
