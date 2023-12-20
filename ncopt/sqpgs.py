@@ -29,10 +29,9 @@ def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):
     
     term3 = 0
     for l in np.arange(len(D_gE)):
-        term2 += np.abs(gE_k[l] + D_gE[l] @ d).max()
+        term3 += np.abs(gE_k[l] + D_gE[l] @ d).max()
     
-    term4 = 0.5 * d@H@d
-    
+    term4 = 0.5 * d.T@H@d
     return term1+term2+term3+term4
 
 def phi_rho(x, f, gI, gE, rho):
@@ -111,6 +110,7 @@ def compute_gradients(fun, X):
     for i in np.arange(N):
         D[i,:,:] = fun.grad(X[i,:])
     
+    # TODO: write this directly in return statement
     D_list = list()
     for j in np.arange(fun.dimOut):
         D_list.append(D[:,j,:])
@@ -174,6 +174,7 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
     pE = np.repeat(pE_, dimE)
       
     # parameters (set after recommendations in paper)
+    # TODO: add params argument to set these
     eta = 1e-8
     gamma = 0.5
     beta_eps = 0.5
@@ -325,7 +326,8 @@ def SQP_GS(f, gI, gE, x0 = None, tol = 1e-8, max_iter = 100, verbose = True, ass
                     if cond:
                         Hs = hH@sl
                         hH = hH - np.outer(Hs,Hs)/(sl @ Hs + 1e-16) + np.outer(yl,yl)/(yl @ sl + 1e-16)
-                    
+
+                # TODO: is this really necessary?    
                 assert np.all(np.abs(hH - hH.T) <= 1e-8), f"{H}"
                 
                 H = hH.copy()
@@ -422,7 +424,7 @@ class Subproblem:
         self.rI = self.cvx_sol_x[self.dim +1          : self.dim +1 +self.nI]
         self.rE = self.cvx_sol_x[self.dim +1 + self.nI : ]
         
-
+        # TODO: pipe through assert_tol
         assert len(self.rE) == self.nE
         assert np.all(self.rI >= -1e-5) , f"{self.rI}"
         assert np.all(self.rE >= -1e-5), f"{self.rE}"
