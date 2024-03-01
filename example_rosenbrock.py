@@ -4,7 +4,7 @@ author: Fabian Schaipp
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ncopt.sqpgs import SQP_GS
+from ncopt.sqpgs import SQPGS
 from ncopt.funs import f_rosenbrock, g_max, g_linear
 #from ncopt.torch_obj import Net
 
@@ -38,7 +38,8 @@ ax.scatter(xstar[0], xstar[1], marker = "*", s = 200, c = "gold", alpha = 1, zor
 
 for i in range(20):
     x0 = np.random.randn(2)# np.zeros(2)
-    x_k, x_hist, SP = SQP_GS(f, gI, gE, x0, tol = 1e-6, max_iter = 100, verbose = False)
+    problem = SQPGS(f, gI, gE, x0, tol = 1e-6, max_iter = 100, verbose = False)
+    x_k = problem.solve()
     print(x_k)
     ax.plot(x_hist[:,0], x_hist[:,1], c = "silver", lw = 0.7, ls = '--', alpha = 0.5)
     ax.scatter(x_k[0], x_k[1], marker = "+", s = 50, c = "k", alpha = 1, zorder = 210)
