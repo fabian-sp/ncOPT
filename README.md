@@ -7,9 +7,11 @@ This repository contains a `Python` implementation of the SQP-GS (*Sequential Qu
 
 The algorithm can solve problems of the form
 
+```
     min  f(x)
     s.t. g(x) <= 0
          h(x) = 0
+```
 
 where `f`, `g` and `h` are locally Lipschitz functions. Hence, the algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to the original paper.
 
@@ -25,8 +27,11 @@ To reproduce this experiment, see the file `example_rosenbrock.py`.
 ## Implementation details
 The solver can be called via 
 
-    SQP_GS(f, gI, gE)
-
+```python
+    from ncopt.sqpgs import SQPGS
+    problem = SQPGS(f, gI, gE)
+    problem.solve()
+```
 It has three main arguments, called `f`, `gI` and `gE`. `f` is the objective. `gI` and `gE` are lists of inequality and equality constraint functions. Each element of `gI` and `gE` as well as the objective `f` needs to be an instance of a class which contains the following properties. The constraint functions are allowed to have multi-dimensional output.
 
 ### Attributes
@@ -45,6 +50,7 @@ Moreover, we implemented a class for a constraint coming from a Pytorch neural n
 
 
 ## References
-* [1] F. E. Curtis and M. L. Overton, A sequential quadratic programming algorithm for nonconvex, nonsmooth constrained optimization, SIAM Journal on Optimization, 22 (2012), pp. 474–500, https://doi.org/10.1137/090780201.
+[1] Frank E. Curtis and Michael L. Overton, A sequential quadratic programming algorithm for nonconvex, nonsmooth constrained optimization, 
+SIAM Journal on Optimization 2012 22:2, 474-500, https://doi.org/10.1137/090780201.
 
-* [2] F. E. Curtis, MATLAB implementation of SLQP-GS, https://coral.ise.lehigh.edu/frankecurtis/software/.
+[2] Frank E. Curtis and Michael L. Overton, MATLAB implementation of SLQP-GS, https://coral.ise.lehigh.edu/frankecurtis/software/.
