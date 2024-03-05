@@ -29,6 +29,7 @@ class DummyNet(torch.nn.Module):
 
     def forward(self, x):
         x = torch.nn.functional.relu(self.conv(x))
+        # x = x.view(x.shape[0], -1) # This would result in errors when computing Jacobian.
         x = x.view(-1, self.linear_input_dim) # Batch dimension specified by -1.
         x = self.linear(x)
         return x

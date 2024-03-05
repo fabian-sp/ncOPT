@@ -2,6 +2,9 @@ import torch
 from torch.autograd.functional import jacobian
 from torch.func import vmap, jacrev, functional_call
 
+import logging
+from typing import Optional
+
 #%% Computing Jacobians
 """
 Important: jacobian and jacrev do the forward pass for each row of the input, that is,
@@ -67,3 +70,38 @@ def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor):
     # argnums specifies which argument to compute jacobian wrt
     # in_dims: dont map over params (None), map over first dim of inputs (0)
     return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
+
+#%%
+# copied from https://github.com/aaronpmishkin/experiment_utils/blob/main/src/experiment_utils/utils.py#L298
+def get_logger(
+    name: str,
+    verbose: bool=False,
+    debug: bool=False,
+    log_file: Optional[str]=None,
+) -> logging.Logger:
+    """Construct a logging.Logger instance with an appropriate configuration.
+
+    Params:
+        name: name for the Logger instance.
+        verbose: (optional) whether or not the logger should print verbosely
+            (ie. at the `INFO` level).
+        debug: (optional) whether or not the logger should print in debug mode
+            (ie. at the `DEBUG` level).
+        log_file: (optional) path to a file where the log should be stored. The
+            log is printed to `stdout` when `None`.
+
+     Returns:
+        Instance of logging.Logger.
+    """
+
+    level = logging.WARNING
+    if debug:
+        level = logging.DEBUG
+    elif verbose:
+        level = logging.INFO
+
+    logging.basicConfig(level=level, filename=log_file)
+    logger = logging.getLogger(name)
+    logging.root.setLevel(level)
+    logger.setLevel(level)
+    return logger
