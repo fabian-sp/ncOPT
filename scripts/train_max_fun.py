@@ -1,9 +1,9 @@
 """
-This is as rather experimental script for training a NN representing the function:
+Script for training a neural network representing the function:
 
-x \mapsto max(c1*x[0], c2*x[1]) - 1
+    f(x): x -> max(c1*x[0], c2*x[1]) - 1
 
-The idea is to use a neural network as a constraint for SQP-GS.
+Serves as example how to use neural networks as constraint functions for SQP-GS.
 """
 
 import numpy as np
@@ -11,174 +11,129 @@ import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import StepLR
 
-c1 = np.sqrt(2); c2 = 2.
+c1 = np.sqrt(2)
+c2 = 2.
 
 @np.vectorize
 def g(x0,x1):
     return np.maximum(c1*x0, c2*x1) - 1
 
-def generate_data(N):
-    x0 = 2*np.random.randn(N)# * 10 - 5
-    x1 = 2*np.random.randn(N)# * 10 - 5
-    x0.sort();x1.sort()
+def generate_data(grid_points):
+    x0 = 2*np.random.randn(grid_points)
+    x1 = 2*np.random.randn(grid_points)
+    x0.sort()
+    x1.sort()
     X0,X1 = np.meshgrid(x0,x1)
     return X0,X1
 
-X0, X1 = generate_data(200)
+grid_points = 500
+X0, X1 = generate_data(grid_points)
 Z = g(X0,X1)
 
-#%%
+#%% Preparations
 
 tmp = np.stack((X0.reshape(-1),X1.reshape(-1))).T
 
-# pytorch weights are in torch.float32, numpy data is float64!
-tX = torch.tensor(tmp, dtype = torch.float32)
-tZ = torch.tensor(Z.reshape(-1), dtype = torch.float32)
+# pytorch weights are in torch.float32, numpy data is float64
+tX = torch.tensor(tmp, dtype=torch.float32)
+tZ = torch.tensor(Z.reshape(-1), dtype=torch.float32)
 
-N = len(tX)
-
-#%%
-# # D_in is input dimension;
-# # H is hidden dimension; D_out is output dimension.
-
-# D_in, H, D_out = 2, 200, 1
-
-# # define model and loss function.
-# model = torch.nn.Sequential(
-#     torch.nn.Linear(D_in, H),
-#     torch.nn.ReLU(),
-#     torch.nn.Linear(H, H),
-#     torch.nn.ReLU(),
-#     torch.nn.Linear(H, H),
-#     torch.nn.ReLU(),
-#     torch.nn.Linear(H, H),
-#     torch.nn.ReLU(),
-#     torch.nn.Linear(H, D_out),
-# )
-
-# loss_fn = torch.nn.MSELoss(reduction='mean')
+num_samples = len(tX)     # number of training points
 
 #%%
 
-class myNN(torch.nn.Module):
+class Max2D(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.l1 = torch.nn.Linear(2, 2) # layer 1
-        #self.l2 = torch.nn.Linear(20, 2) # layer 2
-        #self.relu = torch.nn.ReLU()
-        self.max = torch.max
+        self.l1 = torch.nn.Linear(2, 2) 
     def forward(self, x):
         x = self.l1(x)
-        x,_ = self.max(x, dim = -1)
+        x,_ = torch.max(x, dim=-1)
         return x
 
 loss_fn = torch.nn.MSELoss(reduction='mean')
-
-model = myNN()
-
-# set weights manually
-#model.state_dict()["l1.weight"][:] = torch.diag(torch.tensor([c1,c2]))
-#model.state_dict()["l1.bias"][:] = -torch.ones(2)
+model = Max2D()
 
 print(model.l1.weight)
 print(model.l1.bias)
 
-#testing
-x = torch.tensor([1.,4.])
-model(x)
-g(x[0], x[1])
+# testing
+x = torch.tensor([1., 4.])
+print("True value: ", g(x[0], x[1]), ". Predicted value: ", model(x).item())
 
-#%%
-learning_rate = 1e-3
-N_EPOCHS = 11
-b = 15
 
-#optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-optimizer = torch.optim.SGD(model.parameters(), lr = learning_rate, momentum=0.9, nesterov=True)
+#%% Training
 
-scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+lr = 1e-3
+num_epochs = 10
+batch_size = 25
 
-def sample_batch(N, b):    
-    S = torch.randint(high = N, size = (b,))
+optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
+
+def sample_batch(num_samples, b):    
+    S = torch.randint(high=num_samples, size=(b,))
     return S
 
-for epoch in range(N_EPOCHS):
-    print(f"..................EPOCH {epoch}..................")
-      
-    for t in range(int(N/b)):
+for epoch in range(num_epochs):
+    
+    epoch_loss = 0  
+    for t in range(num_samples//batch_size):
         
-        S = sample_batch(N, b)
-        x_batch = tX[S]; z_batch = tZ[S]
-                
-        # forward pass
-        y_pred = model.forward(x_batch)
-    
-        # compute loss.
-        loss = loss_fn(y_pred.squeeze(), z_batch)
-               
-        # zero gradients
-        optimizer.zero_grad()
-    
-        # backward pass
-        loss.backward()
-    
-        # iteration
-        optimizer.step()
-        
-    print(model.l1.weight)
-    print(model.l1.bias)
+        S = sample_batch(num_samples, batch_size)
+        x_batch = tX[S]
+        z_batch = tZ[S]
 
-    print(loss.item())
-    scheduler.step()
-    #print(optimizer)
+        optimizer.zero_grad()
+            
+        loss = loss_fn(model.forward(x_batch), z_batch)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.item()
+
+    print(f"Epoch {epoch+1}/{num_epochs}: loss={np.mean(epoch_loss)}")
+    scheduler.step()    
+
+print("Learned parameters:")
+print(model.l1.weight)
+print(model.l1.bias)
+
+
+#%% Save checkpoint
+
+path = '../data/checkpoints/max2d.pt'
+torch.save({'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            }, path)
     
-optimizer.zero_grad()       
-    
-#%% plot results
+
+#%% Plot results
 
 N_test = 200
-X0_test,X1_test = generate_data(N_test)
+X0_test, X1_test = generate_data(N_test)
 
 tmp = np.stack((X0_test.reshape(-1), X1_test.reshape(-1))).T
 
-# pytorch weights are in torch.float32, numpy data is float64!
-X_test = torch.tensor(tmp, dtype = torch.float32)
+# pytorch weights are in torch.float32, numpy data is float64
+X_test = torch.tensor(tmp, dtype=torch.float32)
 
 Z_test = model.forward(X_test).detach().numpy().squeeze()
-
 Z_test_arr = Z_test.reshape(N_test, N_test)
+Z_true = g(X0_test,X1_test)
 
-Z_true = g(X0_test,X1_test).reshape(-1)
-
-
-fig, axs = plt.subplots(1,2)
-axs[0].scatter(tmp[:,0], tmp[:,1], c = Z_test)
-#axs[1].scatter(tmp[:,0], tmp[:,1], c = Z_true)
-axs[1].scatter(tmp[:,0], tmp[:,1], c = Z_test-Z_true, vmin = -1e-1, vmax = 1e-1, cmap = "coolwarm")
+print("Test mean squared error: ", np.mean((Z_test-Z_true.reshape(-1))**2))
 
 
-#%%
-from mpl_toolkits.mplot3d import Axes3D
+fig, axs = plt.subplots(1,2, figsize=(8,4))
+ax = axs[0]
+ax.contourf(X0_test, X1_test, Z_test_arr, cmap='magma', vmin=-10,vmax=10,levels=50)
+ax.set_xlim(-5,5)
+ax.set_ylim(-5,5)
+ax.set_title("Learned contours")
 
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-
-# Plot the surface.
-ax.plot_surface(X0_test, X1_test, Z_test_arr, cmap=plt.cm.coolwarm, linewidth=0, antialiased=False)
-
-#%% test auto-diff gradient
-
-x0 = torch.tensor([np.sqrt(2),0.5], dtype = torch.float32)
-
-x0.requires_grad_(True)
-model.zero_grad()
-
-y0 = model(x0)
-y0.backward()
-
-x0.grad.data
-
-W = model[-3].weight.detach().numpy()
-
-
-
+ax = axs[1]
+ax.contourf(X0_test, X1_test, Z_true, cmap='magma', vmin=-10,vmax=10,levels=50)
+ax.set_xlim(-5,5)
+ax.set_ylim(-5,5)
+ax.set_title("True contours")
