@@ -17,6 +17,7 @@ import time
 from typing import Optional
 
 from .defaults import DEFAULT_ARG, DEFAULT_OPTION
+from ..utils import get_logger
 
 class SQPGS:
     def __init__(self,
@@ -28,7 +29,9 @@ class SQPGS:
                  max_iter: int=DEFAULT_ARG.max_iter, 
                  verbose: bool=DEFAULT_ARG.verbose, 
                  options: dict={},
-                 assert_tol: float=DEFAULT_ARG.assert_tol
+                 assert_tol: float=DEFAULT_ARG.assert_tol,
+                 store_history: bool=DEFAULT_ARG.store_history,
+                 log_every: int=DEFAULT_ARG.log_every
                  ) -> None:
         
         if tol < 0:
@@ -46,6 +49,8 @@ class SQPGS:
         self.verbose = verbose
         self.options = options
         self.assert_tol = assert_tol
+        self.store_history = store_history
+        self.log_every = log_every
 
         # Set options/hyperparameters
         # (defaults are chose according to recommendations in paper)
@@ -71,6 +76,7 @@ class SQPGS:
         ########## Initialize
         
         self.status = 'not optimal'
+        self.logger = get_logger(name='ncopt', verbose=self.verbose)
         
         # starting point
         if x0 is None:
@@ -110,7 +116,6 @@ class SQPGS:
         self.SP = SubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol)
         
         E_k = np.inf               # for stopping criterion
-        x_hist = [self.x_k]
         x_kmin1 = None             # last iterate
         g_kmin1 = None             # 
 
@@ -126,6 +131,7 @@ class SQPGS:
         if self.verbose:
             print(hdr_fmt % ("iter", "f(x_k)", "max(g_j(x_k))", "E_k", "step", "subproblem status"))
         
+        x_hist = [self.x_k] if self.store_history else None
         self.timings = {'total': [], 'sp_update': [], 'sp_solve': []}
         ##############################################
         # START OF LOOP
@@ -208,9 +214,12 @@ class SQPGS:
             assert delta_q >= -self.assert_tol, f"Value is supposed to be non-negative, but is {delta_q}."
             assert np.abs(self.SP.lambda_f.sum() - rho) <= self.assert_tol, f"Value is supposed to be negative, but is {np.abs(self.SP.lambda_f.sum() - rho)}."
                      
-            if self.verbose:
-                print(out_fmt % (iter_k, f_k, np.max(np.hstack((gI_k,gE_k))), E_k, do_step, self.SP.status))
+            # if self.verbose:
+            #     print(out_fmt % (iter_k, f_k, np.max(np.hstack((gI_k,gE_k))), E_k, do_step, self.SP.status))
             
+            _viol =  np.max(np.hstack((gI_k, np.abs(gE_k))))
+            self.logger.info(f"Iter {iter_k+1}, objective {f_k:.3E}, constraint violation {_viol:.3E}, accuracy {E_k:.3E}, avg runtime per iter {np.mean(self.timings['total']):.3E}.")
+
             new_E_k = stop_criterion(self.gI, self.gE, g_k, self.SP, gI_k, gE_k, B_gI, B_gE, self.nI_, self.nE_, pI, pE)
             E_k = min(E_k, new_E_k)
             
@@ -273,19 +282,22 @@ class SQPGS:
                 eps *= beta_eps
             
             
-            x_hist.append(self.x_k)
+            if self.store_history:
+                x_hist.append(self.x_k)
             t1 = time.perf_counter()
             self.timings['total'].append(t1-t0)
             
         ##############################################
         # END OF LOOP
         ##############################################
-        self.x_hist = np.vstack(x_hist)
+        self.x_hist = np.vstack(x_hist) if self.store_history else None
     
         if E_k > self.tol:
             self.status = 'max iterations reached'
 
-        print(f"SQP-GS has terminated with status: {self.status}.")
+        _final_msg = f"SQP-GS has terminated with status: {self.status}, final accuracy {E_k}."
+        self.logger.info(_final_msg)
+        print(_final_msg)               # we always want to display this.
 
         return self.x_k
 

@@ -57,7 +57,8 @@ ax.scatter(xstar[0], xstar[1], marker="*", s=200, c="gold", zorder=1)
 
 for i in range(20):
     x0 = np.random.randn(2)
-    problem = SQPGS(f, gI, gE, x0, tol=1e-6, max_iter=100, verbose=False)
+    problem = SQPGS(f, gI, gE, x0, tol=1e-6, max_iter=100, verbose=False,
+                    store_history=True)
     x_k = problem.solve()
     print(x_k)
 
@@ -80,4 +81,4 @@ legend_elements = [Line2D([0], [0], marker='*', lw=0, color='gold', label='Solut
 ax.legend(handles=legend_elements, ncol=3, fontsize=8)
 
 fig.tight_layout()
-fig.savefig('data/img/rosenbrock.png')
+# fig.savefig('data/img/rosenbrock.png')

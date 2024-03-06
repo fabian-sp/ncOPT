@@ -11,6 +11,8 @@ _defaults = {'tol': 1e-8,
              'max_iter': 100,
              'verbose': True,
              'assert_tol': 1e-5,
+             'store_history': False,
+             'log_every': 10
             }
 
 _option_defaults = {'eps': 1e-1,     
