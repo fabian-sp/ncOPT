@@ -1,6 +1,7 @@
 """
 author: Fabian Schaipp
 """
+
 import numpy as np
 from ncopt.funs import f_rosenbrock, g_linear, g_max
 from ncopt.sqpgs import SQP_GS

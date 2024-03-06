@@ -1,7 +1,7 @@
 """
 author: Fabian Schaipp
 
-Notation is (wherever possible) inspired by Curtis, Overton 
+Notation is (wherever possible) inspired by Curtis, Overton
 "SQP FOR NONSMOOTH CONSTRAINED OPTIMIZATION"
 """
 
@@ -409,7 +409,7 @@ class Subproblem:
 
     def solve(self):
         """
-        This solves the quadratic program. In every iteration, you should call 
+        This solves the quadratic program. In every iteration, you should call
         self.update() before solving in order to have the correct subproblem data.
 
         self.d: array
@@ -488,7 +488,7 @@ class Subproblem:
         rI = helper variable for inequality constraints
         rI = helper variable for equality constraints
 
-        This function initializes the variables P,q,G,h. The entries which 
+        This function initializes the variables P,q,G,h. The entries which
         change in every iteration are then updated in self.update()
 
         G and h consist of two parts:
