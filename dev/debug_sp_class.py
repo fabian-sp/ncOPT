@@ -1,7 +1,7 @@
 # test Subproblem class
 
 
-#%%
+# %%
 # dim = 10
 # nI = 3
 # nE = 2
@@ -27,7 +27,7 @@
 # inG = SP.inG
 
 
-# SP.solve()    
+# SP.solve()
 
 # d_k=SP.d
 
