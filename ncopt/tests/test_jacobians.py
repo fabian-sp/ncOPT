@@ -53,6 +53,22 @@ def test_quadratic_jacobian():
 
     return
 
+def test_forward_backward_jacobian():
+    torch.manual_seed(1)
+    inputs = torch.randn(b,d)
+    model = Quadratic(d)
+
+    # f(x) = 0.5 x^T A x --> Df(x) = 0.5*(A+A.T)x
+    expected = 0.5 * inputs @ (model.A.T + model.A) 
+
+    jac1 =  compute_batch_jacobian_vmap(model, inputs, forward=False)      
+    jac2 =  compute_batch_jacobian_vmap(model, inputs, forward=True)   
+
+    assert torch.allclose(expected, jac1, rtol=1e-5, atol=1e-5)
+    assert torch.allclose(jac1, jac2, rtol=1e-5, atol=1e-5)
+
+    return
+
 def test_multidim_output():
 
     model = torch.nn.Sequential(torch.nn.Linear(d,m), 

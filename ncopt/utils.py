@@ -1,6 +1,6 @@
 import torch
 from torch.autograd.functional import jacobian
-from torch.func import vmap, jacrev, functional_call
+from torch.func import vmap, jacrev, jacfwd, functional_call
 
 import logging
 from typing import Optional
@@ -52,7 +52,8 @@ def compute_batch_jacobian_naive(model: torch.nn.Module, inputs: torch.Tensor):
     # want to have batch dimension --> double brackets
     return torch.stack([jacobian(model, inputs[i]) for i in range(b)])
  
-def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor):
+def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor, 
+                                forward: bool=False):
     """
 
     Parameters
@@ -61,6 +62,8 @@ def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor):
         The function of which to compute the Jacobian.
     inputs : torch.Tensor
         The inputs for model. First dimension should be batch dimension.
+    forward: bool. 
+        Whether to compute in forward mode (jacrev or jacfwd). By default False.
     """
     params = dict(model.named_parameters())
 
@@ -69,7 +72,10 @@ def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor):
 
     # argnums specifies which argument to compute jacobian wrt
     # in_dims: dont map over params (None), map over first dim of inputs (0)
-    return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
+    if not forward:
+        return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
+    else:
+        return vmap(jacfwd(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
 
 #%%
 # copied from https://github.com/aaronpmishkin/experiment_utils/blob/main/src/experiment_utils/utils.py#L298
