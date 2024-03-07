@@ -3,6 +3,14 @@ This repository contains a `Python` implementation of the SQP-GS (*Sequential Qu
 
 **Note:** this implementation is a **prototype code**, it has been tested only for a simple problem and it is not performance-optimized. A Matlab implementation is available from the authors of the paper, see [2].
 
+## Installation
+
+If you want to install an editable version of this package in your Python environment, run the command
+
+```
+    python -m pip install --editable .
+```
+
 ## Mathematical description
 
 The algorithm can solve problems of the form
