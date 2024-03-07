@@ -1,1 +1,1 @@
-from .main import SQPGS
+from .main import SQPGS  # noqa
