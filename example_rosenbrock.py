@@ -81,4 +81,4 @@ legend_elements = [Line2D([0], [0], marker='*', lw=0, color='gold', label='Solut
 ax.legend(handles=legend_elements, ncol=3, fontsize=8)
 
 fig.tight_layout()
-# fig.savefig('data/img/rosenbrock.png')
+fig.savefig('data/img/rosenbrock.png')

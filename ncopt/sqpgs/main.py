@@ -126,11 +126,6 @@ class SQPGS:
              
         do_step = False
 
-        hdr_fmt = "%4s\t%10s\t%5s\t%5s\t%10s\t%10s"
-        out_fmt = "%4d\t%10.4g\t%10.4g\t%10.4g\t%10.4g\t%10s"
-        if self.verbose:
-            print(hdr_fmt % ("iter", "f(x_k)", "max(g_j(x_k))", "E_k", "step", "subproblem status"))
-        
         x_hist = [self.x_k] if self.store_history else None
         self.timings = {'total': [], 'sp_update': [], 'sp_solve': []}
         ##############################################
@@ -214,11 +209,10 @@ class SQPGS:
             assert delta_q >= -self.assert_tol, f"Value is supposed to be non-negative, but is {delta_q}."
             assert np.abs(self.SP.lambda_f.sum() - rho) <= self.assert_tol, f"Value is supposed to be negative, but is {np.abs(self.SP.lambda_f.sum() - rho)}."
                      
-            # if self.verbose:
-            #     print(out_fmt % (iter_k, f_k, np.max(np.hstack((gI_k,gE_k))), E_k, do_step, self.SP.status))
-            
-            _viol =  np.max(np.hstack((gI_k, np.abs(gE_k))))
-            self.logger.info(f"Iter {iter_k+1}, objective {f_k:.3E}, constraint violation {_viol:.3E}, accuracy {E_k:.3E}, avg runtime per iter {np.mean(self.timings['total']):.3E}.")
+            # Logging, start after first iteration
+            if iter_k % self.log_every == 1:
+                _viol =  np.max(np.hstack((gI_k, np.abs(gE_k))))
+                self.logger.info(f"Iter {iter_k}, objective {f_k:.3E}, constraint violation {_viol:.3E}, accuracy {E_k:.3E}, avg runtime/iter {(1/1000)*np.mean(self.timings['total']):.3E} ms.")
 
             new_E_k = stop_criterion(self.gI, self.gE, g_k, self.SP, gI_k, gE_k, B_gI, B_gE, self.nI_, self.nE_, pI, pE)
             E_k = min(E_k, new_E_k)
