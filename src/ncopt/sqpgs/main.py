@@ -3,7 +3,7 @@
 
 Implements the SQP-GS algorithm from
 
-    Frank E. Curtis and Michael L. Overton, A sequential quadratic programming 
+    Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
     algorithm for nonconvex, nonsmooth constrained optimization,
     SIAM Journal on Optimization 2012 22:2, 474-500, https://doi.org/10.1137/090780201.
 
@@ -17,8 +17,8 @@ from typing import Optional
 import cvxopt as cx
 import numpy as np
 
-from ncopt.utils import get_logger
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
+from ncopt.utils import get_logger
 
 
 class SQPGS:

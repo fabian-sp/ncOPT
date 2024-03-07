@@ -1,6 +1,7 @@
 """
 author: Fabian Schaipp
 """
+
 import timeit
 
 import numpy as np
