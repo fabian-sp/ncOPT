@@ -19,19 +19,16 @@ def test_rosenbrock_from_zero():
     x_k = problem.solve()
     np.testing.assert_array_almost_equal(x_k, xstar, decimal=4)
 
-    return
-
 
 def test_rosenbrock_from_rand():
     gI = [g]
     gE = []
     xstar = np.array([1 / np.sqrt(2), 0.5])
-    x0 = np.random.rand(2)
+    rng = np.random.default_rng(0)
+    x0 = rng.random(2)
     problem = SQPGS(f, gI, gE, x0=x0, tol=1e-8, max_iter=200, verbose=False)
     x_k = problem.solve()
     np.testing.assert_array_almost_equal(x_k, xstar, decimal=4)
-
-    return
 
 
 def test_rosenbrock_with_eq():
@@ -42,5 +39,3 @@ def test_rosenbrock_with_eq():
     problem = SQPGS(f, gI, gE, tol=1e-8, max_iter=200, verbose=False)
     x_k = problem.solve()
     np.testing.assert_array_almost_equal(x_k, xstar, decimal=4)
-
-    return

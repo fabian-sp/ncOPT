@@ -10,7 +10,7 @@ class f_rosenbrock:
     Nonsmooth Rosenbrock function (see 5.1 in Curtis, Overton
     "SQP FOR NONSMOOTH CONSTRAINED OPTIMIZATION")
 
-    x -> w|x_1^2 − x_2| + (1 − x_1)^2
+    x -> w|x_1^2 - x_2| + (1 - x_1)^2
     """
 
     def __init__(self, w=8):

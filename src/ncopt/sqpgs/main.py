@@ -487,6 +487,7 @@ class SubproblemSQPGS:
         )
 
         self.status = qp["status"]
+        self.objective_val = qp["primal objective"]
         self.cvx_sol_x = np.array(qp["x"]).squeeze()
 
         self.d = self.cvx_sol_x[: self.dim]
