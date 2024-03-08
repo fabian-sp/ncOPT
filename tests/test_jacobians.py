@@ -15,6 +15,14 @@ class Quadratic(torch.nn.Module):
     def forward(self, x):
         return (1 / 2) * x @ self.A @ x
 
+    def forward(self, x):
+        if len(x.shape) == 2:
+            y = torch.matmul(self.A, x.transpose(1,0)).T
+        # no batch dimension
+        else:
+            y = torch.matmul(self.A, x)
+        return 0.5 * (x*y).sum(dim=-1)
+
 
 class DummyNet(torch.nn.Module):
     def __init__(self, d=7, C=1, num_classes=10):
