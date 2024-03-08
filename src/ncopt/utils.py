@@ -1,11 +1,11 @@
-import torch
-from torch.autograd.functional import jacobian
-from torch.func import vmap, jacrev, jacfwd, functional_call
-
 import logging
 from typing import Optional
 
-#%% Computing Jacobians
+import torch
+from torch.autograd.functional import jacobian
+from torch.func import functional_call, jacfwd, jacrev, vmap
+
+# %% Computing Jacobians
 """
 Important: jacobian and jacrev do the forward pass for each row of the input, that is,
 WITHOUT the batch dimension!
@@ -20,7 +20,7 @@ have different results when there is no batch dimension.
     specified with -1, and not with x.shape[0] or similar!
 * For the Jacobian, we get an extra dimension in such cases --> needs to be
      removed later on
-"""   
+"""
 
 """ 
 
@@ -38,6 +38,7 @@ have different results when there is no batch dimension.
         * https://pytorch.org/tutorials/intermediate/jacobians_hessians.html
 """
 
+
 def compute_batch_jacobian_naive(model: torch.nn.Module, inputs: torch.Tensor):
     """
 
@@ -51,9 +52,11 @@ def compute_batch_jacobian_naive(model: torch.nn.Module, inputs: torch.Tensor):
     b = inputs.size(0)
     # want to have batch dimension --> double brackets
     return torch.stack([jacobian(model, inputs[i]) for i in range(b)])
- 
-def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor, 
-                                forward: bool=False):
+
+
+def compute_batch_jacobian_vmap(
+    model: torch.nn.Module, inputs: torch.Tensor, forward: bool = False
+):
     """
 
     Parameters
@@ -62,28 +65,29 @@ def compute_batch_jacobian_vmap(model: torch.nn.Module, inputs: torch.Tensor,
         The function of which to compute the Jacobian.
     inputs : torch.Tensor
         The inputs for model. First dimension should be batch dimension.
-    forward: bool. 
+    forward: bool.
         Whether to compute in forward mode (jacrev or jacfwd). By default False.
     """
     params = dict(model.named_parameters())
 
-    def fmodel(params, inputs): #functional version of model
+    def fmodel(params, inputs):  # functional version of model
         return functional_call(model, params, inputs)
 
     # argnums specifies which argument to compute jacobian wrt
     # in_dims: dont map over params (None), map over first dim of inputs (0)
     if not forward:
-        return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
+        return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None, 0))(params, inputs)
     else:
-        return vmap(jacfwd(fmodel, argnums=(1)), in_dims=(None,0))(params, inputs)
+        return vmap(jacfwd(fmodel, argnums=(1)), in_dims=(None, 0))(params, inputs)
 
-#%%
+
+# %%
 # copied from https://github.com/aaronpmishkin/experiment_utils/blob/main/src/experiment_utils/utils.py#L298
 def get_logger(
     name: str,
-    verbose: bool=False,
-    debug: bool=False,
-    log_file: Optional[str]=None,
+    verbose: bool = False,
+    debug: bool = False,
+    log_file: Optional[str] = None,
 ) -> logging.Logger:
     """Construct a logging.Logger instance with an appropriate configuration.
 
