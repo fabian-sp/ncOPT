@@ -1,3 +1,4 @@
+import cvxpy as cp
 import numpy as np
 import pytest
 
@@ -29,7 +30,7 @@ def subproblem_ineq() -> SubproblemSQPGS:
 
 def test_subproblem_ineq(subproblem_ineq: SubproblemSQPGS):
     subproblem_ineq.solve()
-    assert subproblem_ineq.status == "optimal"
+    assert subproblem_ineq.status == cp.OPTIMAL
     assert np.isclose(subproblem_ineq.objective_val, 0.080804459)
 
 
@@ -60,5 +61,5 @@ def subproblem_eq() -> SubproblemSQPGS:
 
 def test_subproblem_eq(subproblem_eq: SubproblemSQPGS):
     subproblem_eq.solve()
-    assert subproblem_eq.status == "optimal"
+    assert subproblem_eq.status == cp.OPTIMAL
     assert np.isclose(subproblem_eq.objective_val, 0.99500000)

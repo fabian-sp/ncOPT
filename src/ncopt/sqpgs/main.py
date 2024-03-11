@@ -14,7 +14,7 @@ import copy
 import time
 from typing import Optional
 
-import cvxopt as cx
+import cvxpy as cp
 import numpy as np
 
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
@@ -204,7 +204,7 @@ class SQPGS:
             self.timings["sp_update"].append(t11 - t01)
             self.timings["sp_solve"].append(t21 - t11)
 
-            d_k = self.SP.d.copy()
+            d_k = self.SP.d.value.copy()
             # compute g_k from paper
             g_k = (
                 self.SP.lambda_f @ D_f
@@ -440,7 +440,9 @@ def compute_gradients(fun, X):
 
 
 class SubproblemSQPGS:
-    def __init__(self, dim, p0, pI, pE, assert_tol):
+    def __init__(
+        self, dim: int, p0: np.ndarray, pI: np.ndarray, pE: np.ndarray, assert_tol: float
+    ) -> None:
         """
         dim : solution space dimension
         p0 : number of sample points for f (excluding x_k itself)
@@ -457,9 +459,9 @@ class SubproblemSQPGS:
 
         self.assert_tol = assert_tol
 
-        self.P, self.q, self.inG, self.inh, self.nonnegG, self.nonnegh = self.initialize()
+        self.d = cp.Variable(self.dim)
 
-    def solve(self):
+    def solve(self) -> None:
         """
         This solves the quadratic program. In every iteration, you should call
         self.update() before solving in order to have the correct subproblem data.
@@ -477,138 +479,63 @@ class SubproblemSQPGS:
             KKT multipier for inequality constraints.
 
         """
-        cx.solvers.options["show_progress"] = False
+        has_ineq_constraints = self.gI_k.size > 0
+        has_eq_constraints = self.gE_k.size > 0
 
-        iG = np.vstack((self.inG, self.nonnegG))
-        ih = np.hstack((self.inh, self.nonnegh))
+        d = self.d
+        z = cp.Variable()
+        if has_ineq_constraints:
+            r_I = cp.Variable(self.gI_k.size, nonneg=True)
+        if has_eq_constraints:
+            r_E = cp.Variable(self.gE_k.size, nonneg=True)
 
-        qp = cx.solvers.qp(
-            P=cx.matrix(self.P), q=cx.matrix(self.q), G=cx.matrix(iG), h=cx.matrix(ih)
-        )
+        objective = self.rho * z + (1 / 2) * cp.quad_form(d, self.P)
 
-        self.status = qp["status"]
-        self.objective_val = qp["primal objective"]
-        self.cvx_sol_x = np.array(qp["x"]).squeeze()
+        obj_constraint = self.f_k + self.D_f @ d <= z
+        constraints = [obj_constraint]
 
-        self.d = self.cvx_sol_x[: self.dim]
-        self.z = self.cvx_sol_x[self.dim]
+        if has_ineq_constraints:
+            ineq_constraints = [self.gI_k[j] + self.D_gI[j] @ d <= r_I[j] for j in range(self.nI)]
+            constraints += ineq_constraints
+            objective = objective + cp.sum(r_I)
 
-        self.rI = self.cvx_sol_x[self.dim + 1 : self.dim + 1 + self.nI]
-        self.rE = self.cvx_sol_x[self.dim + 1 + self.nI :]
+        if has_eq_constraints:
+            eq_constraints = [self.gE_k[j] + self.D_gE[j] @ d <= r_E[j] for j in range(self.nE)]
+            constraints += eq_constraints
+            objective = objective + cp.sum(r_E)
 
-        assert len(self.rE) == self.nE
-        assert np.all(
-            self.rI >= -self.assert_tol
-        ), f"Array should be non-negative, but minimal value is {np.min(self.rI)}."
-        assert np.all(
-            self.rE >= -self.assert_tol
-        ), f"Array should be non-negative, but minimal value is {np.min(self.rE)}."
+        problem = cp.Problem(cp.Minimize(objective), constraints)
+        problem.solve(solver=cp.CLARABEL)
 
-        # extract dual variables = KKT multipliers
-        self.cvx_sol_z = np.array(qp["z"]).squeeze()
-        lambda_f = self.cvx_sol_z[: self.p0 + 1]
+        self.status = problem.status
+        assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
+        self.objective_val = problem.value
 
-        lambda_gI = list()
-        for j in np.arange(self.nI):
-            start_ix = self.p0 + 1 + (1 + self.pI)[:j].sum()
-            lambda_gI.append(self.cvx_sol_z[start_ix : start_ix + 1 + self.pI[j]])
+        # Extract dual variables
+        duals = problem.solution.dual_vars
+        self.lambda_f = duals[obj_constraint.id]
 
-        lambda_gE = list()
-        for j in np.arange(self.nE):
-            start_ix = self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum()
+        if has_ineq_constraints:
+            self.lambda_gI = [duals[c.id] for c in ineq_constraints]
+        else:
+            self.lambda_gI = []
 
-            # from ineq with +
-            vec1 = self.cvx_sol_z[start_ix : start_ix + 1 + self.pE[j]]
+        if has_eq_constraints:
+            self.lambda_gE = [duals[c.id] for c in eq_constraints]
+        else:
+            self.lambda_gE = []
 
-            # from ineq with -
-            vec2 = self.cvx_sol_z[
-                start_ix + (1 + self.pE).sum() : start_ix + (1 + self.pE).sum() + 1 + self.pE[j]
-            ]
-
-            # see Direction.m line 620 in the original Matlab code
-            lambda_gE.append(vec1 - vec2)
-
-        self.lambda_f = lambda_f.copy()
-        self.lambda_gI = lambda_gI.copy()
-        self.lambda_gE = lambda_gE.copy()
-
-        return
-
-    def initialize(self):
-        """
-        The quadratic subrpoblem we solve in every iteration is of the form:
-
-        min_y 1/2* yPy + q*y subject to Gy <= h
-
-        variable structure: y=(d,z,rI,rE) with
-        d = search direction
-        z = helper variable for objective
-        rI = helper variable for inequality constraints
-        rI = helper variable for equality constraints
-
-        This function initializes the variables P,q,G,h. The entries which
-        change in every iteration are then updated in self.update()
-
-        G and h consist of two parts:
-            1) inG, inh: the inequalities from the paper
-            2) nonnegG, nonnegh: nonnegativity bounds rI >= 0, rE >= 0
-        """
-
-        dimQP = self.dim + 1 + self.nI + self.nE
-
-        P = np.zeros((dimQP, dimQP))
-        q = np.zeros(dimQP)
-
-        inG = np.zeros((1 + self.p0 + np.sum(1 + self.pI) + 2 * np.sum(1 + self.pE), dimQP))
-        inh = np.zeros(1 + self.p0 + np.sum(1 + self.pI) + 2 * np.sum(1 + self.pE))
-
-        # structure of inG (p0+1, sum(1+pI), sum(1+pE), sum(1+pE))
-        inG[: self.p0 + 1, self.dim] = -1
-
-        for j in range(self.nI):
-            inG[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1,
-                self.dim + 1 + j,
-            ] = -1
-
-        for j in range(self.nE):
-            inG[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                self.dim + 1 + self.nI + j,
-            ] = -1
-            inG[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                self.dim + 1 + self.nI + j,
-            ] = -1
-
-        # we have nI+nE r-variables
-        nonnegG = np.hstack(
-            (np.zeros((self.nI + self.nE, self.dim + 1)), -np.eye(self.nI + self.nE))
-        )
-        nonnegh = np.zeros(self.nI + self.nE)
-
-        return P, q, inG, inh, nonnegG, nonnegh
-
-    def update(self, H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k):
+    def update(
+        self,
+        H: np.ndarray,
+        rho: float,
+        D_f: np.ndarray,
+        D_gI: list,
+        D_gE: list,
+        f_k: float,
+        gI_k: np.ndarray,
+        gE_k: np.ndarray,
+    ) -> None:
         """
 
         Parameters
@@ -635,74 +562,12 @@ class SubproblemSQPGS:
         None.
 
         """
-        self.P[: self.dim, : self.dim] = H
-        self.q = np.hstack((np.zeros(self.dim), rho, np.ones(self.nI), np.ones(self.nE)))
+        self.P = H
+        self.rho = rho
 
-        self.inG[: self.p0 + 1, : self.dim] = D_f
-        self.inh[: self.p0 + 1] = -f_k
-
-        for j in range(self.nI):
-            self.inG[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1,
-                : self.dim,
-            ] = D_gI[j]
-            self.inh[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1
-            ] = -gI_k[j]
-
-        for j in range(self.nE):
-            self.inG[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                : self.dim,
-            ] = D_gE[j]
-            self.inG[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                : self.dim,
-            ] = -D_gE[j]
-
-            self.inh[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1
-            ] = -gE_k[j]
-            self.inh[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1
-            ] = gE_k[j]
-
-        return
+        self.D_f = D_f
+        self.D_gI = D_gI
+        self.D_gE = D_gE
+        self.f_k = f_k
+        self.gI_k = gI_k
+        self.gE_k = gE_k

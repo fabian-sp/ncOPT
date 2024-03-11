@@ -27,6 +27,8 @@ dependencies = [
   "numpy",
   "torch",
   "cvxopt",
+  "cvxpy-base",
+  "clarabel",
 ]
 
 [project.urls]
