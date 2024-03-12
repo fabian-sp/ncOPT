@@ -500,8 +500,11 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_I)
 
         if has_eq_constraints:
-            eq_constraints = [self.gE_k[j] + self.D_gE[j] @ d <= r_E[j] for j in range(self.nE)]
-            constraints += eq_constraints
+            eq_constraints_plus = [
+                self.gE_k[j] + self.D_gE[j] @ d <= r_E[j] for j in range(self.nE)
+            ]
+            eq_constraints_neg = [self.gE_k[j] + self.D_gE[j] @ d >= r_E[j] for j in range(self.nE)]
+            constraints += eq_constraints_plus + eq_constraints_neg
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
@@ -521,7 +524,10 @@ class SubproblemSQPGS:
             self.lambda_gI = []
 
         if has_eq_constraints:
-            self.lambda_gE = [duals[c.id] for c in eq_constraints]
+            self.lambda_gE = [
+                duals[c_plus.id] - duals[c_neg.id]
+                for c_plus, c_neg in zip(eq_constraints_plus, eq_constraints_neg)
+            ]
         else:
             self.lambda_gE = []
 
