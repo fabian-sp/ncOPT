@@ -3,7 +3,7 @@ from typing import Optional
 
 import torch
 from torch.autograd.functional import jacobian
-from torch.func import functional_call, jacfwd, jacrev, vmap
+from torch.func import jacfwd, jacrev, vmap
 
 # %% Computing Jacobians
 """
@@ -39,8 +39,10 @@ have different results when there is no batch dimension.
 """
 
 
-def compute_batch_jacobian_naive(model: torch.nn.Module, inputs: torch.Tensor):
-    """
+def compute_batch_jacobian_naive(
+    model: torch.nn.Module, inputs: torch.Tensor
+) -> tuple[torch.tensor, torch.tensor]:
+    """Naive way for computing Jacobian. Used for testing.
 
     Parameters
     ----------
@@ -48,16 +50,26 @@ def compute_batch_jacobian_naive(model: torch.nn.Module, inputs: torch.Tensor):
         The function of which to compute the Jacobian.
     inputs : torch.Tensor
         The inputs for model. First dimension should be batch dimension.
+
+    Returns
+    -------
+    tuple[torch.tensor, torch.tensor]
+        Jacobian and output.
     """
     b = inputs.size(0)
     # want to have batch dimension --> double brackets
-    return torch.stack([jacobian(model, inputs[i]) for i in range(b)])
+    out = model.forward(inputs)
+    jac = torch.stack([jacobian(model, inputs[[i]]) for i in range(b)])
+    # Now jac has shape [b, 1, out_dim, 1, in_dim]  --> squeeze
+    jac = jac.squeeze(dim=(1, 3))
+    return jac, out
 
 
 def compute_batch_jacobian_vmap(
     model: torch.nn.Module, inputs: torch.Tensor, forward: bool = False
 ):
-    """
+    """Vmap over batch dimension. This has the issue that the inputs are given to
+    model.forward() without the first dimension. We counteract by adding a dummy dimension.
 
     Parameters
     ----------
@@ -67,18 +79,65 @@ def compute_batch_jacobian_vmap(
         The inputs for model. First dimension should be batch dimension.
     forward: bool.
         Whether to compute in forward mode (jacrev or jacfwd). By default False.
-    """
-    params = dict(model.named_parameters())
 
-    def fmodel(params, inputs):  # functional version of model
-        return functional_call(model, params, inputs)
+    Returns
+    -------
+    tuple[torch.tensor, torch.tensor]
+        Jacobian and output.
+    """
+
+    # functional version of model; dummy dimension becaus vmap removes batch dim
+    def fmodel(model, inputs):
+        out = model(inputs[None, :])
+        return out, out
 
     # argnums specifies which argument to compute jacobian wrt
     # in_dims: dont map over params (None), map over first dim of inputs (0)
     if not forward:
-        return vmap(jacrev(fmodel, argnums=(1)), in_dims=(None, 0))(params, inputs)
+        jac, out = vmap(jacrev(fmodel, argnums=(1), has_aux=True), in_dims=(None, 0))(model, inputs)
     else:
-        return vmap(jacfwd(fmodel, argnums=(1)), in_dims=(None, 0))(params, inputs)
+        jac, out = vmap(jacfwd(fmodel, argnums=(1), has_aux=True), in_dims=(None, 0))(model, inputs)
+
+    # now remove dummy dimension again
+    jac = jac.squeeze(dim=1)
+    out = out.squeeze(dim=1)
+    return jac, out
+
+
+def compute_batch_jacobian(
+    model: torch.nn.Module, inputs: torch.Tensor, forward: bool = False
+) -> tuple[torch.tensor, torch.tensor]:
+    """Not using vmap. This results in the Jacobian being of shape
+    [batch_size, dim_out, batch_size, *dim_in]
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The function of which to compute the Jacobian.
+    inputs : torch.Tensor
+        The inputs for model. First dimension should be batch dimension.
+    forward: bool.
+        Whether to compute in forward mode (jacrev or jacfwd). By default False.
+
+    Returns
+    -------
+    tuple[torch.tensor, torch.tensor]
+        Jacobian and output.
+    """
+
+    def fmodel(model, inputs):  # functional version of model
+        out = model(inputs)
+        return out, out
+
+    # argnums specifies which argument to compute jacobian wrt
+    if not forward:
+        jac, out = jacrev(fmodel, argnums=(1), has_aux=True)(model, inputs)
+    else:
+        jac, out = jacfwd(fmodel, argnums=(1), has_aux=True)(model, inputs)
+
+    # Now only take the "diagonal". This only works if output shape is scalar/vector.
+    jac = torch.stack([jac[i, :, i, :] for i in range(jac.shape[0])])
+    return jac, out
 
 
 # %%
