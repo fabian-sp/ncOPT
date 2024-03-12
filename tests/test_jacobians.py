@@ -30,7 +30,7 @@ class DummyNet(torch.nn.Module):
 
 
 ######################################################
-#### Tests start here
+# Tests start here
 
 
 @pytest.mark.parametrize(
