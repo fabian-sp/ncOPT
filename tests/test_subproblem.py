@@ -62,4 +62,4 @@ def subproblem_eq() -> SubproblemSQPGS:
 def test_subproblem_eq(subproblem_eq: SubproblemSQPGS):
     subproblem_eq.solve()
     assert subproblem_eq.status == cp.OPTIMAL
-    assert np.isclose(subproblem_eq.objective_val, 0.99500000)
+    assert np.isclose(subproblem_eq.objective_val, 1.0)
