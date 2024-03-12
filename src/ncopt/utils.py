@@ -16,10 +16,7 @@ E.g. if input has shape (d1, d2), then normal forward pas has input
 This becomes an issue when there are reshape/view modules, because they often will
 have different results when there is no batch dimension.
 
-* If the forward method uses rehshape/view, the batch dimension should be
-    specified with -1, and not with x.shape[0] or similar!
-* For the Jacobian, we get an extra dimension in such cases --> needs to be
-     removed later on
+So we fix this by adding dummy dimensions!
 """
 
 """ 
@@ -57,12 +54,12 @@ def compute_batch_jacobian_naive(
         Jacobian and output.
     """
     b = inputs.size(0)
-    # want to have batch dimension --> double brackets
     out = model.forward(inputs)
+    # want to have batch dimension --> double brackets
     jac = torch.stack([jacobian(model, inputs[[i]]) for i in range(b)])
     # Now jac has shape [b, 1, out_dim, 1, in_dim]  --> squeeze
-    jac = jac.squeeze(dim=(1, 3))
-    return jac, out
+    # This only works if output shape is scalar/vector.
+    return jac.squeeze(dim=(1, 3)), out
 
 
 def compute_batch_jacobian_vmap(
@@ -86,7 +83,7 @@ def compute_batch_jacobian_vmap(
         Jacobian and output.
     """
 
-    # functional version of model; dummy dimension becaus vmap removes batch dim
+    # functional version of model; dummy dim because vmap removes batch_dim
     def fmodel(model, inputs):
         out = model(inputs[None, :])
         return out, out
@@ -99,9 +96,7 @@ def compute_batch_jacobian_vmap(
         jac, out = vmap(jacfwd(fmodel, argnums=(1), has_aux=True), in_dims=(None, 0))(model, inputs)
 
     # now remove dummy dimension again
-    jac = jac.squeeze(dim=1)
-    out = out.squeeze(dim=1)
-    return jac, out
+    return jac.squeeze(dim=1), out.squeeze(dim=1)
 
 
 def compute_batch_jacobian(
