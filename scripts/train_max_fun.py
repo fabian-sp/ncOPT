@@ -97,7 +97,7 @@ for epoch in range(num_epochs):
         optimizer.step()
         epoch_loss += loss.item()
 
-    print(f"Epoch {epoch+1}/{num_epochs}: loss={np.mean(epoch_loss)}")
+    print(f"Epoch {epoch + 1}/{num_epochs}: loss={np.mean(epoch_loss)}")
     scheduler.step()
 
 print("Learned parameters:")

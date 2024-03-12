@@ -29,7 +29,7 @@ xstar = np.array([1 / np.sqrt(2), 0.5])  # solution
 problem = SQPGS(f, gI, gE, x0=None, tol=1e-6, max_iter=100, verbose=True)
 x = problem.solve()
 
-print("Distance to solution:", f"{np.linalg.norm(x-xstar):.9f}")
+print("Distance to solution:", f"{np.linalg.norm(x - xstar):.9f}")
 
 # %% Solve from multiple starting points and plot
 
