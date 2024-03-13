@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from ncopt.functions import ObjectiveOrConstraint
 from ncopt.functions.quadratic import Quadratic
 from ncopt.utils import (
     compute_batch_jacobian,
@@ -140,5 +141,29 @@ def test_multidim_output_multiaxis_input():
 
     assert torch.allclose(jac1, jac2, rtol=1e-5, atol=1e-5)
     assert torch.allclose(jac1, jac3, rtol=1e-5, atol=1e-5)
+
+    return
+
+
+def test_input_cropping():
+    """Jacobians computed correctly after cropping the input tensor."""
+    model = torch.nn.Linear(d, m)
+    inputs = torch.randn(b, d)
+
+    jac, out = compute_batch_jacobian_vmap(model, inputs)
+
+    def crop_inputs(x):
+        return x[:, :d]
+
+    f = ObjectiveOrConstraint(model, prepare_inputs=crop_inputs)
+
+    garbage = torch.randn(b, 2 * d)
+    inputs2 = torch.hstack((inputs, garbage))
+
+    jac2, out2 = compute_batch_jacobian_vmap(f, inputs2)
+
+    assert torch.allclose(out, out2, rtol=1e-5, atol=1e-5)
+    assert torch.allclose(jac2[:, :, :d], jac, rtol=1e-5, atol=1e-5)
+    assert torch.allclose(jac2[:, :, d:], torch.zeros(b, m, 2 * d))
 
     return
