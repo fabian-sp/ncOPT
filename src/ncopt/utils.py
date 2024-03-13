@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from torch.autograd.functional import jacobian
@@ -38,7 +38,7 @@ So we fix this by adding dummy dimensions!
 
 def compute_batch_jacobian_naive(
     model: torch.nn.Module, inputs: torch.Tensor
-) -> tuple[torch.tensor, torch.tensor]:
+) -> Tuple[torch.tensor, torch.tensor]:
     """Naive way for computing Jacobian. Used for testing.
 
     Parameters
@@ -101,7 +101,7 @@ def compute_batch_jacobian_vmap(
 
 def compute_batch_jacobian(
     model: torch.nn.Module, inputs: torch.Tensor, forward: bool = False
-) -> tuple[torch.tensor, torch.tensor]:
+) -> Tuple[torch.tensor, torch.tensor]:
     """Not using vmap. This results in the Jacobian being of shape
     [batch_size, dim_out, batch_size, *dim_in]
 
