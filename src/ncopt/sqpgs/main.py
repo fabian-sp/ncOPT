@@ -14,7 +14,7 @@ import copy
 import time
 from typing import Optional
 
-import cvxopt as cx
+import cvxpy as cp
 import numpy as np
 
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
@@ -66,7 +66,7 @@ class SQPGS:
         self.options.update(options)
 
         ###############################################################
-        ########## Extract dimensions
+        # Extract dimensions
 
         # extract dimensions of constraints
         self.dim = self.f.dim
@@ -80,7 +80,7 @@ class SQPGS:
         self.nE = sum(self.dimE)  # number of equality costraints
 
         ###############################################################
-        ########## Initialize
+        # Initialize
 
         self.status = "not optimal"
         self.logger = get_logger(name="ncopt", verbose=self.verbose)
@@ -91,11 +91,9 @@ class SQPGS:
         else:
             self.x_k = x0.copy()
 
-        return
-
     def solve(self):
         ###############################################################
-        ########## Set all hyperparameters
+        # Set all hyperparameters
 
         eps = self.options["eps"]  # sampling radius
         rho = self.options["rho"]
@@ -195,16 +193,12 @@ class SQPGS:
             # SUBPROBLEM
             ##############################################
 
-            t01 = time.perf_counter()
-            self.SP.update(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
-            t11 = time.perf_counter()
-            self.SP.solve()
-            t21 = time.perf_counter()
+            self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
 
-            self.timings["sp_update"].append(t11 - t01)
-            self.timings["sp_solve"].append(t21 - t11)
+            self.timings["sp_update"].append(self.SP.setup_time)
+            self.timings["sp_solve"].append(self.SP.solve_time)
 
-            d_k = self.SP.d.copy()
+            d_k = self.SP.d.value.copy()
             # compute g_k from paper
             g_k = (
                 self.SP.lambda_f @ D_f
@@ -232,7 +226,7 @@ class SQPGS:
                 self.logger.info(
                     f"Iter {iter_k}, objective {f_k:.3E}, constraint violation {viol_k:.3E}, \
                     accuracy {E_k:.3E}, \
-                    avg runtime/iter {(1e3)*np.mean(self.timings['total']):.3E} ms."
+                    avg runtime/iter {(1e3) * np.mean(self.timings['total']):.3E} ms."
                 )
 
             new_E_k = stop_criterion(
@@ -440,7 +434,9 @@ def compute_gradients(fun, X):
 
 
 class SubproblemSQPGS:
-    def __init__(self, dim, p0, pI, pE, assert_tol):
+    def __init__(
+        self, dim: int, p0: np.ndarray, pI: np.ndarray, pE: np.ndarray, assert_tol: float
+    ) -> None:
         """
         dim : solution space dimension
         p0 : number of sample points for f (excluding x_k itself)
@@ -449,169 +445,68 @@ class SubproblemSQPGS:
         """
 
         self.dim = dim
-        self.nI = len(pI)
-        self.nE = len(pE)
         self.p0 = p0
         self.pI = pI
         self.pE = pE
 
         self.assert_tol = assert_tol
 
-        self.P, self.q, self.inG, self.inh, self.nonnegG, self.nonnegh = self.initialize()
+        self.d = cp.Variable(self.dim)
+        self._problem = None
 
-    def solve(self):
+    @property
+    def nI(self) -> int:
+        return len(self.pI)
+
+    @property
+    def nE(self) -> int:
+        return len(self.pE)
+
+    @property
+    def has_ineq_constraints(self) -> bool:
+        return self.nI > 0
+
+    @property
+    def has_eq_constraints(self) -> bool:
+        return self.nE > 0
+
+    @property
+    def problem(self) -> cp.Problem:
+        assert self._problem is not None, "Problem not yet initialized."
+        return self._problem
+
+    @property
+    def status(self) -> str:
+        return self.problem.status
+
+    @property
+    def objective_val(self) -> float:
+        return self.problem.value
+
+    @property
+    def setup_time(self) -> float:
+        return self.problem.solver_stats.setup_time
+
+    @property
+    def solve_time(self) -> float:
+        return self.problem.solver_stats.solve_time
+
+    def solve(
+        self,
+        H: np.ndarray,
+        rho: float,
+        D_f: np.ndarray,
+        D_gI: list[np.ndarray],
+        D_gE: list[np.ndarray],
+        f_k: float,
+        gI_k: np.ndarray,
+        gE_k: np.ndarray,
+    ) -> None:
         """
-        This solves the quadratic program. In every iteration, you should call
-        self.update() before solving in order to have the correct subproblem data.
-
-        self.d: array
-            search direction
-
-        self.lambda_f: array
-            KKT multipier for objective.
-
-        self.lambda_gE: list
-            KKT multipier for equality constraints.
-
-        self.lambda_gI: list
-            KKT multipier for inequality constraints.
-
-        """
-        cx.solvers.options["show_progress"] = False
-
-        iG = np.vstack((self.inG, self.nonnegG))
-        ih = np.hstack((self.inh, self.nonnegh))
-
-        qp = cx.solvers.qp(
-            P=cx.matrix(self.P), q=cx.matrix(self.q), G=cx.matrix(iG), h=cx.matrix(ih)
-        )
-
-        self.status = qp["status"]
-        self.cvx_sol_x = np.array(qp["x"]).squeeze()
-
-        self.d = self.cvx_sol_x[: self.dim]
-        self.z = self.cvx_sol_x[self.dim]
-
-        self.rI = self.cvx_sol_x[self.dim + 1 : self.dim + 1 + self.nI]
-        self.rE = self.cvx_sol_x[self.dim + 1 + self.nI :]
-
-        assert len(self.rE) == self.nE
-        assert np.all(
-            self.rI >= -self.assert_tol
-        ), f"Array should be non-negative, but minimal value is {np.min(self.rI)}."
-        assert np.all(
-            self.rE >= -self.assert_tol
-        ), f"Array should be non-negative, but minimal value is {np.min(self.rE)}."
-
-        # extract dual variables = KKT multipliers
-        self.cvx_sol_z = np.array(qp["z"]).squeeze()
-        lambda_f = self.cvx_sol_z[: self.p0 + 1]
-
-        lambda_gI = list()
-        for j in np.arange(self.nI):
-            start_ix = self.p0 + 1 + (1 + self.pI)[:j].sum()
-            lambda_gI.append(self.cvx_sol_z[start_ix : start_ix + 1 + self.pI[j]])
-
-        lambda_gE = list()
-        for j in np.arange(self.nE):
-            start_ix = self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum()
-
-            # from ineq with +
-            vec1 = self.cvx_sol_z[start_ix : start_ix + 1 + self.pE[j]]
-
-            # from ineq with -
-            vec2 = self.cvx_sol_z[
-                start_ix + (1 + self.pE).sum() : start_ix + (1 + self.pE).sum() + 1 + self.pE[j]
-            ]
-
-            # see Direction.m line 620 in the original Matlab code
-            lambda_gE.append(vec1 - vec2)
-
-        self.lambda_f = lambda_f.copy()
-        self.lambda_gI = lambda_gI.copy()
-        self.lambda_gE = lambda_gE.copy()
-
-        return
-
-    def initialize(self):
-        """
-        The quadratic subrpoblem we solve in every iteration is of the form:
-
-        min_y 1/2* yPy + q*y subject to Gy <= h
-
-        variable structure: y=(d,z,rI,rE) with
-        d = search direction
-        z = helper variable for objective
-        rI = helper variable for inequality constraints
-        rI = helper variable for equality constraints
-
-        This function initializes the variables P,q,G,h. The entries which
-        change in every iteration are then updated in self.update()
-
-        G and h consist of two parts:
-            1) inG, inh: the inequalities from the paper
-            2) nonnegG, nonnegh: nonnegativity bounds rI >= 0, rE >= 0
-        """
-
-        dimQP = self.dim + 1 + self.nI + self.nE
-
-        P = np.zeros((dimQP, dimQP))
-        q = np.zeros(dimQP)
-
-        inG = np.zeros((1 + self.p0 + np.sum(1 + self.pI) + 2 * np.sum(1 + self.pE), dimQP))
-        inh = np.zeros(1 + self.p0 + np.sum(1 + self.pI) + 2 * np.sum(1 + self.pE))
-
-        # structure of inG (p0+1, sum(1+pI), sum(1+pE), sum(1+pE))
-        inG[: self.p0 + 1, self.dim] = -1
-
-        for j in range(self.nI):
-            inG[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1,
-                self.dim + 1 + j,
-            ] = -1
-
-        for j in range(self.nE):
-            inG[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                self.dim + 1 + self.nI + j,
-            ] = -1
-            inG[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                self.dim + 1 + self.nI + j,
-            ] = -1
-
-        # we have nI+nE r-variables
-        nonnegG = np.hstack(
-            (np.zeros((self.nI + self.nE, self.dim + 1)), -np.eye(self.nI + self.nE))
-        )
-        nonnegh = np.zeros(self.nI + self.nE)
-
-        return P, q, inG, inh, nonnegG, nonnegh
-
-    def update(self, H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k):
-        """
+        This solves the quadratic program
 
         Parameters
-        ----------
+
         H : array
             Hessian approximation
         rho : float
@@ -629,79 +524,63 @@ class SubproblemSQPGS:
         gE_k : array
             evaluation of equality constraints at x_k.
 
-        Returns
-        -------
-        None.
+        Updates
+        self.d: Variable
+            search direction
+
+        self.lambda_f: array
+            KKT multipier for objective.
+
+        self.lambda_gE: list
+            KKT multipier for equality constraints.
+
+        self.lambda_gI: list
+            KKT multipier for inequality constraints.
 
         """
-        self.P[: self.dim, : self.dim] = H
-        self.q = np.hstack((np.zeros(self.dim), rho, np.ones(self.nI), np.ones(self.nE)))
 
-        self.inG[: self.p0 + 1, : self.dim] = D_f
-        self.inh[: self.p0 + 1] = -f_k
+        d = self.d
+        z = cp.Variable()
+        if self.has_ineq_constraints:
+            r_I = cp.Variable(gI_k.size, nonneg=True)
+        if self.has_eq_constraints:
+            r_E = cp.Variable(gE_k.size, nonneg=True)
 
-        for j in range(self.nI):
-            self.inG[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1,
-                : self.dim,
-            ] = D_gI[j]
-            self.inh[
-                self.p0 + 1 + (1 + self.pI)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI)[:j].sum()
-                + self.pI[j]
-                + 1
-            ] = -gI_k[j]
+        objective = rho * z + (1 / 2) * cp.quad_form(d, H)
 
-        for j in range(self.nE):
-            self.inG[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                : self.dim,
-            ] = D_gE[j]
-            self.inG[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1,
-                : self.dim,
-            ] = -D_gE[j]
+        obj_constraint = f_k + D_f @ d <= z
+        constraints = [obj_constraint]
 
-            self.inh[
-                self.p0 + 1 + (1 + self.pI).sum() + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1
-            ] = -gE_k[j]
-            self.inh[
-                self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum() : self.p0
-                + 1
-                + (1 + self.pI).sum()
-                + (1 + self.pE).sum()
-                + (1 + self.pE)[:j].sum()
-                + self.pE[j]
-                + 1
-            ] = gE_k[j]
+        if self.has_ineq_constraints:
+            ineq_constraints = [gI_k[j] + D_gI[j] @ d <= r_I[j] for j in range(self.nI)]
+            constraints += ineq_constraints
+            objective = objective + cp.sum(r_I)
 
-        return
+        if self.has_eq_constraints:
+            eq_constraints_plus = [gE_k[j] + D_gE[j] @ d <= r_E[j] for j in range(self.nE)]
+            eq_constraints_neg = [gE_k[j] + D_gE[j] @ d >= r_E[j] for j in range(self.nE)]
+            constraints += eq_constraints_plus + eq_constraints_neg
+            objective = objective + cp.sum(r_E)
+
+        problem = cp.Problem(cp.Minimize(objective), constraints)
+        problem.solve(solver=cp.CLARABEL)
+
+        assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
+        self._problem = problem
+
+        # Extract dual variables
+        duals = problem.solution.dual_vars
+        self.lambda_f = duals[obj_constraint.id]
+
+        if self.has_ineq_constraints:
+            self.lambda_gI = [duals[c.id] for c in ineq_constraints]
+        else:
+            self.lambda_gI = []
+
+        if self.has_eq_constraints:
+            self.lambda_gE = [
+                duals[c_plus.id] - duals[c_neg.id]
+                for c_plus, c_neg in zip(eq_constraints_plus, eq_constraints_neg)
+            ]
+        else:
+            self.lambda_gE = []
