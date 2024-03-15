@@ -49,11 +49,6 @@ num_samples = len(tX)  # number of training points
 
 # %%
 loss_fn = torch.nn.MSELoss(reduction="mean")
-# model = MaxOfLinear(params=(torch.tensor([[c1, 0], [0, c2]]),
-#                             torch.tensor([-1., -1.])
-#                             )
-#                     )
-
 model = MaxOfLinear(input_dim=2, output_dim=2)
 
 print(model.linear.weight.data)

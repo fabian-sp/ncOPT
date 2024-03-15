@@ -16,6 +16,22 @@ class MaxOfLinear(torch.nn.Module):
         params: tuple = None,
         dtype=torch.float32,
     ):
+        """
+        Either specify input_dim and output_dim, or specify params in the form
+        (A, b) where A and b are both a torch.tensor.
+
+        Parameters
+        ----------
+        input_dim : int, optional
+            Input dimension of the linear layer, by default None
+        output_dim : int, optional
+            Output dimension of the linear layer, by default None
+        params : tuple, optional
+            If you want to fix the linear mapping, specify as (A, b).
+            By default None.
+        dtype : _type_, optional
+            Will convert params to this type for the linear layer, by default torch.float32
+        """
         super().__init__()
 
         assert params is not None or (

@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import torch
 
@@ -165,5 +166,35 @@ def test_input_cropping():
     assert torch.allclose(out, out2, rtol=1e-5, atol=1e-5)
     assert torch.allclose(jac2[:, :, :d], jac, rtol=1e-5, atol=1e-5)
     assert torch.allclose(jac2[:, :, d:], torch.zeros(b, m, 2 * d))
+
+    return
+
+
+def test_input_reshape():
+    """Jacobians computed correctly after reshaping the input tensor."""
+    pixel = 7
+    channel = 1
+    num_classes = 9
+    input_dim = (channel, pixel, pixel)
+    inputs = torch.randn(b, *input_dim)
+    inputs_flat = inputs.reshape(b, -1)
+
+    model = DummyNet(d=pixel, C=channel, num_classes=num_classes)
+
+    jac, out = compute_batch_jacobian_vmap(model, inputs)
+
+    # it is important to use x.shape[0], as batch size can be different in vmap
+    def reshape_inputs(x):
+        return x.reshape(x.shape[0], *input_dim)
+
+    assert torch.allclose(inputs, reshape_inputs(inputs_flat))
+
+    f = ObjectiveOrConstraint(model, prepare_inputs=reshape_inputs)
+
+    jac2, out2 = compute_batch_jacobian_vmap(f, inputs_flat)
+
+    assert torch.allclose(out, out2, rtol=1e-5, atol=1e-5)
+    assert jac2.shape == torch.Size([b, num_classes, np.prod(input_dim)])
+    assert torch.allclose(jac2.reshape(b, num_classes, *input_dim), jac, rtol=1e-5, atol=1e-5)
 
     return
