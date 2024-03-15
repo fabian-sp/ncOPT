@@ -2,10 +2,13 @@ import torch
 
 
 class Quadratic(torch.nn.Module):
-    def __init__(self, input_dim: int = None, params: tuple = None):
-        """Implements the function
+    """A quadratic function. Implements the mapping
 
-            x --> (1/2)*x.T*A*x + b.T*x + c
+    x --> (1/2)*x.T*A*x + b.T*x + c
+    """
+
+    def __init__(self, input_dim: int = None, params: tuple = None):
+        """
 
         Parameters
         ----------
