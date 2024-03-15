@@ -9,7 +9,13 @@ class MaxOfLinear(torch.nn.Module):
     where the maximum is taken over the components of Ax + b.
     """
 
-    def __init__(self, input_dim: int = None, output_dim: int = None, params: tuple = None):
+    def __init__(
+        self,
+        input_dim: int = None,
+        output_dim: int = None,
+        params: tuple = None,
+        dtype=torch.float32,
+    ):
         super().__init__()
 
         assert params is not None or (
@@ -26,14 +32,15 @@ class MaxOfLinear(torch.nn.Module):
         self.linear = torch.nn.Linear(input_dim, output_dim)
 
         # Set the weights if the mapping is given
+        # Default type of torch.nn.Linear is float32
         if params is not None:
-            self.linear.weight.data = params[0]
-            self.linear.bias.data = params[1]
+            self.linear.weight.data = params[0].type(dtype)
+            self.linear.bias.data = params[1].type(dtype)
 
         return
 
     def forward(self, x):
         x = self.linear(x)
-        # make sure to have output shape [batch_siez, 1] by keepdim=True
+        # make sure to have output shape [batch_size, 1] by keepdim=True
         x, _ = torch.max(x, dim=-1, keepdim=True)
         return x

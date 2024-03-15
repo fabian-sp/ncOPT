@@ -11,6 +11,10 @@ import numpy as np
 import torch
 from torch.optim.lr_scheduler import StepLR
 
+from ncopt.functions.max_linear import MaxOfLinear
+
+# %% Generate data
+
 c1 = np.sqrt(2)
 c2 = 2.0
 
@@ -44,28 +48,20 @@ tZ = torch.tensor(Z.reshape(-1), dtype=torch.float32)
 num_samples = len(tX)  # number of training points
 
 # %%
-
-
-class Max2D(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.l1 = torch.nn.Linear(2, 2)
-
-    def forward(self, x):
-        x = self.l1(x)
-        x, _ = torch.max(x, dim=-1)
-        return x
-
-
 loss_fn = torch.nn.MSELoss(reduction="mean")
-model = Max2D()
+# model = MaxOfLinear(params=(torch.tensor([[c1, 0], [0, c2]]),
+#                             torch.tensor([-1., -1.])
+#                             )
+#                     )
 
-print(model.l1.weight)
-print(model.l1.bias)
+model = MaxOfLinear(input_dim=2, output_dim=2)
+
+print(model.linear.weight.data)
+print(model.linear.bias.data)
 
 # testing
-x = torch.tensor([1.0, 4.0])
-print("True value: ", g(x[0], x[1]), ". Predicted value: ", model(x).item())
+x = torch.tensor([[1.0, 4.0]])
+print("True value: ", g(x[0, 0], x[0, 1]), ". Predicted value: ", model(x)[0].item())
 
 
 # %% Training
@@ -88,7 +84,7 @@ for epoch in range(num_epochs):
     for t in range(num_samples // batch_size):
         S = sample_batch(num_samples, batch_size)
         x_batch = tX[S]
-        z_batch = tZ[S]
+        z_batch = tZ[S][:, None]  # dummy dimension to match model output
 
         optimizer.zero_grad()
 
@@ -101,8 +97,8 @@ for epoch in range(num_epochs):
     scheduler.step()
 
 print("Learned parameters:")
-print(model.l1.weight)
-print(model.l1.bias)
+print(model.linear.weight.data)
+print(model.linear.bias.data)
 
 
 # %% Save checkpoint
