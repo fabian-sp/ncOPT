@@ -8,7 +8,7 @@ class NonsmoothRosenbrock(torch.nn.Module):
 
     """
 
-    def __init__(self, a: float = 8):
+    def __init__(self, a: float = 8.0):
         super().__init__()
 
         self.a = a
