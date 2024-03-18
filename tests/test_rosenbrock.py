@@ -7,8 +7,10 @@ import numpy as np
 from ncopt.funs import f_rosenbrock, g_linear, g_max
 from ncopt.sqpgs.main import SQPGS
 
-f = f_rosenbrock()
+f = f_rosenbrock(w=8.0)
 g = g_max()
+
+np.random.seed(12345)
 
 
 def test_rosenbrock_from_zero():
