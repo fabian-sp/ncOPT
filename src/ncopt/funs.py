@@ -26,18 +26,18 @@ class f_rosenbrock:
         return np.abs(x[0] ** 2 - x[1]) > 1e-10
 
     def grad(self, x):
-        a = np.array([-2 + x[0], 0])
+        a = np.array([-2 + 2 * x[0], 0.0])
         sign = np.sign(x[0] ** 2 - x[1])
 
         if sign == 1:
-            b = np.array([2 * x[0], -1])
+            b = np.array([2 * x[0], -1.0])
         elif sign == -1:
-            b = np.array([-2 * x[0], 1])
+            b = np.array([-2 * x[0], 1.0])
         else:
-            b = np.array([-2 * x[0], 1])
+            b = np.array([-2 * x[0], 1.0])
 
         # b = np.sign(x[0]**2 -x[1]) * np.array([2*x[0], -1])
-        return a + b
+        return a + self.w * b
 
 
 class g_max:

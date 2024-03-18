@@ -9,9 +9,11 @@ from matplotlib.lines import Line2D
 from ncopt.funs import f_rosenbrock, g_max
 from ncopt.sqpgs import SQPGS
 
+np.random.seed(1234)
+
 # %% Setup
 
-f = f_rosenbrock()
+f = f_rosenbrock(w=8.0)
 g = g_max()
 
 # could add this equality constraint
@@ -45,7 +47,6 @@ for j in np.arange(X.shape[0]):
 
 fig, ax = plt.subplots(figsize=(5, 4))
 
-np.random.seed(123)
 
 # Plot contour and solution
 ax.contourf(X, Y, Z, cmap="gist_heat", levels=20, alpha=0.7, antialiased=True, lw=0, zorder=0)
@@ -55,7 +56,7 @@ ax.contourf(X, Y, Z, cmap="gist_heat", levels=20, alpha=0.7, antialiased=True, l
 #             antialiased=True, linewidths=4, zorder=0)
 ax.scatter(xstar[0], xstar[1], marker="*", s=200, c="gold", zorder=1)
 
-for i in range(20):
+for i in range(10):
     x0 = np.random.randn(2)
     problem = SQPGS(f, gI, gE, x0, tol=1e-6, max_iter=100, verbose=False, store_history=True)
     x_k = problem.solve()
@@ -80,3 +81,5 @@ ax.legend(handles=legend_elements, ncol=3, fontsize=8)
 
 fig.tight_layout()
 fig.savefig("data/img/rosenbrock.png")
+
+# %%

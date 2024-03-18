@@ -136,7 +136,13 @@ class SQPGS:
         do_step = False
 
         x_hist = [self.x_k] if self.store_history else None
-        self.timings = {"total": [], "sp_update": [], "sp_solve": []}
+        timings = {"total": [], "sp_update": [], "sp_solve": []}
+        metrics = {
+            "objective": [],
+            "constraint_violation": [],
+            "accuracy": [],
+            "sampling_radius": [],
+        }
         ##############################################
         # START OF LOOP
         ##############################################
@@ -195,8 +201,8 @@ class SQPGS:
 
             self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
 
-            self.timings["sp_update"].append(self.SP.setup_time)
-            self.timings["sp_solve"].append(self.SP.solve_time)
+            timings["sp_update"].append(self.SP.setup_time)
+            timings["sp_solve"].append(self.SP.solve_time)
 
             d_k = self.SP.d.value.copy()
             # compute g_k from paper
@@ -226,8 +232,12 @@ class SQPGS:
                 self.logger.info(
                     f"Iter {iter_k}, objective {f_k:.3E}, constraint violation {viol_k:.3E}, \
                     accuracy {E_k:.3E}, \
-                    avg runtime/iter {(1e3) * np.mean(self.timings['total']):.3E} ms."
+                    avg runtime/iter {(1e3) * np.mean(timings['total']):.3E} ms."
                 )
+                metrics["objective"].append(f_k)
+                metrics["constraint_violation"].append(viol_k)
+                metrics["accuracy"].append(E_k)
+                metrics["sampling_radius"].append(eps)
 
             new_E_k = stop_criterion(
                 self.gI, self.gE, g_k, self.SP, gI_k, gE_k, B_gI, B_gE, self.nI_, self.nE_, pI, pE
@@ -301,13 +311,13 @@ class SQPGS:
             if self.store_history:
                 x_hist.append(self.x_k)
             t1 = time.perf_counter()
-            self.timings["total"].append(t1 - t0)
+            timings["total"].append(t1 - t0)
 
         ##############################################
         # END OF LOOP
         ##############################################
         self.x_hist = np.vstack(x_hist) if self.store_history else None
-
+        self.info = {"timings": timings, "metrics": metrics}
         if E_k > self.tol:
             self.status = "max iterations reached"
 
