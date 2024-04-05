@@ -12,21 +12,23 @@ The notation of the code tries to follow closely the notation of the paper.
 
 import copy
 import time
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import cvxpy as cp
 import numpy as np
+import torch
 
+from ncopt.functions import ObjectiveOrConstraint
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
-from ncopt.utils import get_logger
+from ncopt.utils import compute_batch_jacobian_vmap, get_logger
 
 
 class SQPGS:
     def __init__(
         self,
-        f,
-        gI,
-        gE,
+        f: List[ObjectiveOrConstraint],
+        gI: List[ObjectiveOrConstraint],
+        gE: List[ObjectiveOrConstraint],
         x0: Optional[np.array] = None,
         tol: float = DEFAULT_ARG.tol,
         max_iter: int = DEFAULT_ARG.max_iter,
@@ -98,7 +100,6 @@ class SQPGS:
         eps = self.options["eps"]  # sampling radius
         rho = self.options["rho"]
         theta = self.options["theta"]
-
         eta = self.options["eta"]
         gamma = self.options["gamma"]
         beta_eps = self.options["beta_eps"]
@@ -144,7 +145,7 @@ class SQPGS:
             "sampling_radius": [],
         }
         ##############################################
-        # START OF LOOP
+        # Start of loop
         ##############################################
         for iter_k in range(self.max_iter):
             t0 = time.perf_counter()
@@ -153,7 +154,7 @@ class SQPGS:
                 break
 
             ##############################################
-            # SAMPLING
+            # Sampling
             ##############################################
             B_f = sample_points(self.x_k, eps, p0)
             B_f = np.vstack((self.x_k, B_f))
@@ -171,7 +172,7 @@ class SQPGS:
                 B_gE.append(B_j)
 
             ####################################
-            # COMPUTE GRADIENTS AND EVALUATE
+            # Compute gradients and evaluate
             ###################################
             D_f = compute_gradients(self.f, B_f)[0]  # returns list, always has one element
 
@@ -196,7 +197,7 @@ class SQPGS:
                 gE_k = np.array([])
 
             ##############################################
-            # SUBPROBLEM
+            # Subproblem solve
             ##############################################
 
             self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
@@ -245,7 +246,7 @@ class SQPGS:
             E_k = min(E_k, new_E_k)
 
             ##############################################
-            # STEP
+            # Step
             ##############################################
 
             do_step = delta_q > nu * eps**2  # Flag whether step is taken or not
@@ -290,7 +291,7 @@ class SQPGS:
                     H = hH.copy()
 
                 ####################################
-                # ACTUAL STEP
+                # Actual step
                 ###################################
                 x_kmin1 = self.x_k.copy()
                 g_kmin1 = g_k.copy()
@@ -298,7 +299,7 @@ class SQPGS:
                 self.x_k = self.x_k + alpha * d_k
 
             ##############################################
-            # NO STEP
+            # No step
             ##############################################
             else:
                 if v_k <= theta:
@@ -314,7 +315,7 @@ class SQPGS:
             timings["total"].append(t1 - t0)
 
         ##############################################
-        # END OF LOOP
+        # End of loop
         ##############################################
         self.x_hist = np.vstack(x_hist) if self.store_history else None
         self.info = {"timings": timings, "metrics": metrics}
@@ -328,17 +329,49 @@ class SQPGS:
         return self.x_k
 
 
-def sample_points(x, eps, N):
-    """
-    sample N points uniformly distributed in eps-ball around x
+def sample_points(x: torch.Tensor, eps: float, n_points: int) -> torch.Tensor:
+    """Sample ``n_points`` uniformly from the ``eps``-ball around ``x``.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        The centre of the ball.
+    eps : float
+        Sampling radius.
+    n_points : int
+        Number of sampled points.
+
+    Returns
+    -------
+    torch.Tensor
+        Shape (n_points, len(x)).
     """
     dim = len(x)
-    U = np.random.randn(N, dim)
-    norm_U = np.linalg.norm(U, axis=1)
-    R = np.random.rand(N) ** (1 / dim)
-    Z = eps * (R / norm_U)[:, np.newaxis] * U
+    U = torch.randn(n_points, dim)
+    norm_U = torch.linalg.norm(U, axis=1)
+    R = torch.rand(n_points) ** (1 / dim)
+    Z = eps * (R / norm_U).reshape(-1, 1) * U
 
-    return x + Z
+    return x.reshape(1, -1) + Z
+
+
+def compute_gradients():
+    return
+
+
+def compute_value_and_jacobian(
+    f: ObjectiveOrConstraint, X: torch.Tensor
+) -> Tuple[torch.tensor, torch.tensor]:
+    """Evaluates function value and Jacobian for a batched input ``X``.
+
+    Parameters
+    ----------
+    f : ObjectiveOrConstraint
+        The function to evaluate. Should map from ``dim`` to R^m (with m integer)
+    X : torch.Tensor
+        Input points. Should be of shape ``(batch_size, dim)``.
+    """
+    return compute_batch_jacobian_vmap(f, X)
 
 
 def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):
@@ -420,24 +453,6 @@ def eval_ineq(fun, X):
         ] = fun.eval(X[i, :])
 
     return [D[:, j] for j in range(fun.dimOut)]
-
-
-def compute_gradients(fun, X):
-    """
-    computes gradients of function object f at all rows of array X
-
-    Returns
-    -------
-    list of 2d-matrices, length of fun.dimOut
-    """
-    (N, dim) = X.shape
-
-    # fun.grad returns Jacobian, i.e. dimOut x dim
-    D = np.zeros((N, fun.dimOut, dim))
-    for i in np.arange(N):
-        D[i, :, :] = fun.grad(X[i, :])
-
-    return [D[:, j, :] for j in np.arange(fun.dimOut)]
 
 
 # %%

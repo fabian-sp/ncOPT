@@ -4,17 +4,21 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib.lines import Line2D
 
-from ncopt.funs import f_rosenbrock, g_max
+from ncopt.functions.max_linear import MaxOfLinear
+from ncopt.functions.rosenbrock import NonsmoothRosenbrock
 from ncopt.sqpgs import SQPGS
 
 np.random.seed(1234)
 
 # %% Setup
 
-f = f_rosenbrock(w=8.0)
-g = g_max()
+f = NonsmoothRosenbrock(a=8.0)
+g = MaxOfLinear(
+    params=(torch.diag(torch.tensor([torch.sqrt(torch.tensor(2.0)), 2.0])), -torch.ones(2))
+)
 
 # could add this equality constraint
 # A = np.eye(2); b = np.ones(2)*5; g1 = g_linear(A, b)

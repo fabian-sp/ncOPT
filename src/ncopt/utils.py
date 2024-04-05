@@ -64,7 +64,7 @@ def compute_batch_jacobian_naive(
 
 def compute_batch_jacobian_vmap(
     model: torch.nn.Module, inputs: torch.Tensor, forward: bool = False
-):
+) -> Tuple[torch.tensor, torch.tensor]:
     """Vmap over batch dimension. This has the issue that the inputs are given to
     model.forward() without the first dimension. We counteract by adding a dummy dimension.
 
