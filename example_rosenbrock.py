@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from matplotlib.lines import Line2D
 
+from ncopt.functions import ObjectiveOrConstraint
 from ncopt.functions.max_linear import MaxOfLinear
 from ncopt.functions.rosenbrock import NonsmoothRosenbrock
 from ncopt.sqpgs import SQPGS
@@ -15,18 +16,18 @@ np.random.seed(1234)
 
 # %% Setup
 
-f = NonsmoothRosenbrock(a=8.0)
+f = ObjectiveOrConstraint(NonsmoothRosenbrock(a=8.0), dim=2)
 g = MaxOfLinear(
     params=(torch.diag(torch.tensor([torch.sqrt(torch.tensor(2.0)), 2.0])), -torch.ones(2))
 )
 
-# could add this equality constraint
-# A = np.eye(2); b = np.ones(2)*5; g1 = g_linear(A, b)
+# optional equality constraint
+g2 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
 
 # inequality constraints (list of functions)
-gI = [g]
+gI = [ObjectiveOrConstraint(g, dim_out=1)]
 # equality constraints (list of functions)
-gE = []
+gE = [g2]
 
 xstar = np.array([1 / np.sqrt(2), 0.5])  # solution
 

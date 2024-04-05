@@ -12,7 +12,7 @@ The notation of the code tries to follow closely the notation of the paper.
 
 import copy
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import cvxpy as cp
 import numpy as np
@@ -71,9 +71,16 @@ class SQPGS:
         # Extract dimensions
 
         # extract dimensions of constraints
+        if not hasattr(f, "dim"):
+            raise KeyError(
+                "Input dimension needs to be specified for the objective function \
+                           Make sure to pass `dim` when initializing the \
+                            `ObjectiveOrConstraint` object."
+            )
+
         self.dim = self.f.dim
-        self.dimI = np.array([g.dimOut for g in self.gI], dtype=int)
-        self.dimE = np.array([g.dimOut for g in self.gE], dtype=int)
+        self.dimI = np.array([g.dim_out for g in self.gI], dtype=int)
+        self.dimE = np.array([g.dim_out for g in self.gE], dtype=int)
 
         self.nI_ = len(self.gI)  # number of inequality function objects
         self.nE_ = len(self.gE)  # number of equality function objects
@@ -119,6 +126,8 @@ class SQPGS:
             self.nE_, dtype=int
         )  # sample points for eq constraint
 
+        # TODO: if functon is differentiable, set to zero here
+
         pI = np.repeat(pI_, self.dimI)
         pE = np.repeat(pE_, self.dimE)
         ###############################################################
@@ -156,45 +165,80 @@ class SQPGS:
             ##############################################
             # Sampling
             ##############################################
-            B_f = sample_points(self.x_k, eps, p0)
-            B_f = np.vstack((self.x_k, B_f))
+            B_f = sample_points(self.x_k, eps, p0, stack_x=True)
 
             B_gI = list()
             for j in np.arange(self.nI_):
-                B_j = sample_points(self.x_k, eps, pI_[j])
-                B_j = np.vstack((self.x_k, B_j))
+                B_j = sample_points(self.x_k, eps, pI_[j], stack_x=True)
                 B_gI.append(B_j)
 
             B_gE = list()
             for j in np.arange(self.nE_):
-                B_j = sample_points(self.x_k, eps, pE_[j])
-                B_j = np.vstack((self.x_k, B_j))
+                B_j = sample_points(self.x_k, eps, pE_[j], stack_x=True)
                 B_gE.append(B_j)
 
             ####################################
             # Compute gradients and evaluate
             ###################################
-            D_f = compute_gradients(self.f, B_f)[0]  # returns list, always has one element
+            # D_f = compute_gradients(self.f, B_f)[0]  # returns list, always has one element
 
-            D_gI = list()
+            # D_gI = list()
+            # for j in np.arange(self.nI_):
+            #     D_gI += compute_gradients(self.gI[j], B_gI[j])
+
+            # D_gE = list()
+            # for j in np.arange(self.nE_):
+            #     D_gE += compute_gradients(self.gE[j], B_gE[j])
+
+            # f_k = self.f.eval(self.x_k)
+            # # hstack cannot handle empty lists!
+            # if self.nI_ > 0:
+            #     gI_k = np.hstack([self.gI[j].eval(self.x_k) for j in range(self.nI_)])
+            # else:
+            #     gI_k = np.array([])
+
+            # if self.nE_ > 0:
+            #     gE_k = np.hstack([self.gE[j].eval(self.x_k) for j in range(self.nE_)])
+            # else:
+            #     gE_k = np.array([])
+
+            # NEW
+            D_f, V_f = compute_value_and_jacobian(self.f, B_f, as_numpy=True, split_jac=False)
+            f_k = V_f[0]  # convert to float
+            # squeeze output dimension
+            D_f = D_f.squeeze(axis=1)
+
+            D_gI, V_gI = list(), list()
             for j in np.arange(self.nI_):
-                D_gI += compute_gradients(self.gI[j], B_gI[j])
+                this_jac, this_out = compute_value_and_jacobian(
+                    self.gI[j], B_gI[j], as_numpy=True, split_jac=True
+                )
+                D_gI += this_jac
+                V_gI.append(this_out)
 
-            D_gE = list()
+            D_gE, V_gE = list(), list()
             for j in np.arange(self.nE_):
-                D_gE += compute_gradients(self.gE[j], B_gE[j])
+                this_jac, this_out = compute_value_and_jacobian(
+                    self.gE[j], B_gE[j], as_numpy=True, split_jac=True
+                )
+                D_gE += this_jac
+                V_gE.append(this_out)
 
-            f_k = self.f.eval(self.x_k)
+            print(D_gI)
+            print(D_gE)
+
+            # Get value at x_k
             # hstack cannot handle empty lists!
             if self.nI_ > 0:
-                gI_k = np.hstack([self.gI[j].eval(self.x_k) for j in range(self.nI_)])
-            else:
-                gI_k = np.array([])
+                gI_k = np.hstack([v[0] for v in V_gI])
 
             if self.nE_ > 0:
-                gE_k = np.hstack([self.gE[j].eval(self.x_k) for j in range(self.nE_)])
-            else:
-                gE_k = np.array([])
+                gE_k = np.hstack([v[0] for v in V_gE])
+
+            print(gI_k)
+            print(gE_k)
+
+            assert False, "Rewrote until here"
 
             ##############################################
             # Subproblem solve
@@ -329,7 +373,7 @@ class SQPGS:
         return self.x_k
 
 
-def sample_points(x: torch.Tensor, eps: float, n_points: int) -> torch.Tensor:
+def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = True) -> torch.Tensor:
     """Sample ``n_points`` uniformly from the ``eps``-ball around ``x``.
 
     Parameters
@@ -340,29 +384,38 @@ def sample_points(x: torch.Tensor, eps: float, n_points: int) -> torch.Tensor:
         Sampling radius.
     n_points : int
         Number of sampled points.
-
+    stack_x : bool
+        Whether to stack ``x`` itself at the top. Default true.
     Returns
     -------
     torch.Tensor
         Shape (n_points, len(x)).
     """
     dim = len(x)
-    U = torch.randn(n_points, dim)
-    norm_U = torch.linalg.norm(U, axis=1)
-    R = torch.rand(n_points) ** (1 / dim)
-    Z = eps * (R / norm_U).reshape(-1, 1) * U
+    if n_points == 0:
+        # return only x
+        X = torch.empty(1, dim)
+    else:
+        U = torch.randn(n_points, dim)
+        norm_U = torch.linalg.norm(U, axis=1)
+        R = torch.rand(n_points) ** (1 / dim)
+        X = eps * (R / norm_U).reshape(-1, 1) * U
 
-    return x.reshape(1, -1) + Z
+        if stack_x:
+            X = torch.vstack((torch.zeros(1, dim), X))
 
-
-def compute_gradients():
-    return
+    if isinstance(x, np.ndarray):
+        X += torch.from_numpy(x).reshape(1, -1)
+    else:
+        X += x.reshape(1, -1)
+    return X
 
 
 def compute_value_and_jacobian(
-    f: ObjectiveOrConstraint, X: torch.Tensor
-) -> Tuple[torch.tensor, torch.tensor]:
+    f: ObjectiveOrConstraint, X: torch.Tensor, as_numpy: bool = True, split_jac: bool = True
+) -> Tuple[Union[torch.tensor, np.ndarray], Union[torch.tensor, np.ndarray]]:
     """Evaluates function value and Jacobian for a batched input ``X``.
+
 
     Parameters
     ----------
@@ -370,8 +423,27 @@ def compute_value_and_jacobian(
         The function to evaluate. Should map from ``dim`` to R^m (with m integer)
     X : torch.Tensor
         Input points. Should be of shape ``(batch_size, dim)``.
+    as_numpy : bool, optional
+        Whether to convert Jacobian into numpy array, by default True
+    split_jac : bool, optional
+        Whether to split Jacobian into a list, by default True.
+        The splitting happens wrt the output dimension.
+
+    Returns
+    -------
+    Tuple[Union[torch.tensor, np.ndarray], Union[torch.tensor, float]]
+        Jacobian of shape (batch_size, dim), and output values of shape (batch_size, dim_out).
     """
-    return compute_batch_jacobian_vmap(f, X)
+    jac, out = compute_batch_jacobian_vmap(f, X)
+
+    if as_numpy:
+        jac = jac.detach().numpy()
+        out = out.detach().numpy()
+
+    if split_jac:
+        jac = [jac[:, j, :] for j in range(jac.shape[1])]
+
+    return jac, out
 
 
 def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):

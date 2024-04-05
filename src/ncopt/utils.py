@@ -10,7 +10,7 @@ from torch.func import jacfwd, jacrev, vmap
 Important: jacobian and jacrev do the forward pass for each row of the input, that is,
 WITHOUT the batch dimension!
 
-E.g. if input has shape (d1, d2), then normal forward pas has input
+E.g. if input has shape (d1, d2), then normal forward pass has input
 (b, d1, d2); but jacobian/jacrev will do the forward pass with a (d1,d2) tensor.
 
 This becomes an issue when there are reshape/view modules, because they often will
@@ -19,16 +19,15 @@ have different results when there is no batch dimension.
 So we fix this by adding dummy dimensions!
 """
 
-""" 
-
+"""
     Functions for computing the Jacobian of model(inputs) wrt. inputs.
-    Assume inputs has shape (batch, *d), where d itself could be a tuple. 
+    We compute Jacobian and output simultaneously.
+    
+    Assume that a batched input has shape (b, *d), where d itself could be a tuple,
+    and b is the batch size. 
     Assume that model output has shape m (with m integer).
 
-    Then the Jacobian of model has shape (m,d). 
-    The output of the below functions should have 
-        - either shape (b,m,*d),
-        - or shape (b,1,m,*d) (see above for explanation).
+    Then we want to compute a batched Jacobian of shape (b, m, *d).
 
     For more info see:
         * https://discuss.pytorch.org/t/computing-batch-jacobian-efficiently/80771/11
