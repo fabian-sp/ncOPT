@@ -412,8 +412,8 @@ def compute_value_and_jacobian(
     jac, out = compute_batch_jacobian_vmap(f, X)
 
     if as_numpy:
-        jac = jac.detach().numpy()
-        out = out.detach().numpy()
+        jac = jac.detach().cpu().numpy()
+        out = out.detach().cpu().numpy()
 
     if split_jac:
         jac = [jac[:, j, :] for j in range(jac.shape[1])]
