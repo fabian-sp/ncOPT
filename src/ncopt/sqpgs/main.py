@@ -214,8 +214,6 @@ class SQPGS:
             else:
                 gE_k = np.array([])
 
-            # assert False, "Rewrote until here"
-
             ##############################################
             # Subproblem solve
             ##############################################
@@ -467,7 +465,6 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, V_gI, V_gE, nI_, nE_):
 
     gI_vals = list()
     for j in np.arange(nI_):
-        # gI_vals += eval_ineq(gI[j], B_gI[j])
         V = V_gI[j]
         gI_vals += [V[:, i] for i in range(gI[j].dim_out)]
 
@@ -477,7 +474,6 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, V_gI, V_gE, nI_, nE_):
 
     gE_vals = list()
     for j in np.arange(nE_):
-        # gE_vals += eval_ineq(gE[j], B_gE[j])
         V = V_gE[j]
         gE_vals += [V[:, i] for i in range(gE[j].dim_out)]
 
@@ -486,26 +482,6 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, V_gI, V_gE, nI_, nE_):
         val5 = np.maximum(val5, np.max(SP.lambda_gE[j] * gE_vals[j]))
 
     return np.max(np.array([val1, val2, val3, val4, val5]))
-
-
-def eval_ineq(fun, X):
-    """
-    evaluate function at multiple inputs
-    needed in stop_criterion
-
-    Returns
-    -------
-    list of array, number of entries = fun.dimOut
-    """
-    (N, _) = X.shape
-    D = np.zeros((N, fun.dimOut))
-    for i in np.arange(N):
-        D[
-            i,
-            :,
-        ] = fun.single_eval(X[i, :])
-
-    return [D[:, j] for j in range(fun.dimOut)]
 
 
 # %%
