@@ -180,31 +180,9 @@ class SQPGS:
             ####################################
             # Compute gradients and evaluate
             ###################################
-            # D_f = compute_gradients(self.f, B_f)[0]  # returns list, always has one element
-
-            # D_gI = list()
-            # for j in np.arange(self.nI_):
-            #     D_gI += compute_gradients(self.gI[j], B_gI[j])
-
-            # D_gE = list()
-            # for j in np.arange(self.nE_):
-            #     D_gE += compute_gradients(self.gE[j], B_gE[j])
-
-            # f_k = self.f.eval(self.x_k)
-            # # hstack cannot handle empty lists!
-            # if self.nI_ > 0:
-            #     gI_k = np.hstack([self.gI[j].eval(self.x_k) for j in range(self.nI_)])
-            # else:
-            #     gI_k = np.array([])
-
-            # if self.nE_ > 0:
-            #     gE_k = np.hstack([self.gE[j].eval(self.x_k) for j in range(self.nE_)])
-            # else:
-            #     gE_k = np.array([])
-
-            # NEW
             D_f, V_f = compute_value_and_jacobian(self.f, B_f, as_numpy=True, split_jac=False)
-            f_k = V_f[0]  # convert to float
+            assert V_f.shape[1] == 1, "Objective must be a scalar function."
+            f_k = V_f[0, 0]  # convert to float
             # squeeze output dimension
             D_f = D_f.squeeze(axis=1)
 
@@ -224,21 +202,19 @@ class SQPGS:
                 D_gE += this_jac
                 V_gE.append(this_out)
 
-            print(D_gI)
-            print(D_gE)
-
             # Get value at x_k
             # hstack cannot handle empty lists!
             if self.nI_ > 0:
                 gI_k = np.hstack([v[0] for v in V_gI])
+            else:
+                gI_k = np.array([])
 
             if self.nE_ > 0:
                 gE_k = np.hstack([v[0] for v in V_gE])
+            else:
+                gE_k = np.array([])
 
-            print(gI_k)
-            print(gE_k)
-
-            assert False, "Rewrote until here"
+            # assert False, "Rewrote until here"
 
             ##############################################
             # Subproblem solve
@@ -274,10 +250,11 @@ class SQPGS:
                 violI_k = np.maximum(gI_k, 0)
                 violE_k = np.abs(gE_k)
                 viol_k = np.max(np.hstack((violI_k, violE_k)))
+
                 self.logger.info(
-                    f"Iter {iter_k}, objective {f_k:.3E}, constraint violation {viol_k:.3E}, \
-                    accuracy {E_k:.3E}, \
-                    avg runtime/iter {(1e3) * np.mean(timings['total']):.3E} ms."
+                    f"Iter {iter_k}, objective {f_k:.3E}, constraint violation {viol_k:.3E}, "
+                    + f"accuracy {E_k:.3E}, "
+                    + f"avg runtime/iter {(1e3) * np.mean(timings['total']):.3E} ms."
                 )
                 metrics["objective"].append(f_k)
                 metrics["constraint_violation"].append(viol_k)
@@ -285,7 +262,7 @@ class SQPGS:
                 metrics["sampling_radius"].append(eps)
 
             new_E_k = stop_criterion(
-                self.gI, self.gE, g_k, self.SP, gI_k, gE_k, B_gI, B_gE, self.nI_, self.nE_, pI, pE
+                self.gI, self.gE, g_k, self.SP, gI_k, gE_k, V_gI, V_gE, self.nI_, self.nE_
             )
             E_k = min(E_k, new_E_k)
 
@@ -462,23 +439,23 @@ def q_rho(d, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE):
 
 
 def phi_rho(x, f, gI, gE, rho):
-    term1 = rho * f.eval(x)
+    term1 = rho * f.single_eval(x).squeeze()  # want a float here
 
     # inequalities
     if len(gI) > 0:
-        term2 = np.sum(np.hstack([np.maximum(gI[j].eval(x), 0) for j in range(len(gI))]))
+        term2 = np.sum(np.hstack([np.maximum(gI[j].single_eval(x), 0) for j in range(len(gI))]))
     else:
         term2 = 0
     # equalities: max(x,0) + max(-x,0) = abs(x)
     if len(gE) > 0:
-        term3 = np.sum(np.hstack([np.abs(gE[l].eval(x)) for l in range(len(gE))]))
+        term3 = np.sum(np.hstack([np.abs(gE[l].single_eval(x)) for l in range(len(gE))]))
     else:
         term3 = 0
 
     return term1 + term2 + term3
 
 
-def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE):
+def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, V_gI, V_gE, nI_, nE_):
     """
     computes E_k in the paper
     """
@@ -490,7 +467,9 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE):
 
     gI_vals = list()
     for j in np.arange(nI_):
-        gI_vals += eval_ineq(gI[j], B_gI[j])
+        # gI_vals += eval_ineq(gI[j], B_gI[j])
+        V = V_gI[j]
+        gI_vals += [V[:, i] for i in range(gI[j].dim_out)]
 
     val4 = -np.inf
     for j in np.arange(len(gI_vals)):
@@ -498,7 +477,9 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, B_gI, B_gE, nI_, nE_, pI, pE):
 
     gE_vals = list()
     for j in np.arange(nE_):
-        gE_vals += eval_ineq(gE[j], B_gE[j])
+        # gE_vals += eval_ineq(gE[j], B_gE[j])
+        V = V_gE[j]
+        gE_vals += [V[:, i] for i in range(gE[j].dim_out)]
 
     val5 = -np.inf
     for j in np.arange(len(gE_vals)):
@@ -522,7 +503,7 @@ def eval_ineq(fun, X):
         D[
             i,
             :,
-        ] = fun.eval(X[i, :])
+        ] = fun.single_eval(X[i, :])
 
     return [D[:, j] for j in range(fun.dimOut)]
 

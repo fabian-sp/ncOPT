@@ -40,7 +40,8 @@ class ObjectiveOrConstraint(torch.nn.Module):
         This is needed for the Armijo line search in SQPGS.
         """
         if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x)
+            # TODO: can we do the conversion conditional on the function dtype?
+            x = torch.from_numpy(x).to(torch.float32)
 
         with torch.no_grad():
             out = self.forward(x.reshape(1, -1))

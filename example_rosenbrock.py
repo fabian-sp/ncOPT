@@ -23,6 +23,8 @@ g = MaxOfLinear(
 
 # optional equality constraint
 g2 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
+g2.model.weight.data = torch.eye(2)
+g2.model.bias.data = torch.zeros(2)
 
 # inequality constraints (list of functions)
 gI = [ObjectiveOrConstraint(g, dim_out=1)]
