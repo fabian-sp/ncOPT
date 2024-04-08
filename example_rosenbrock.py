@@ -21,15 +21,16 @@ g = MaxOfLinear(
     params=(torch.diag(torch.tensor([torch.sqrt(torch.tensor(2.0)), 2.0])), -torch.ones(2))
 )
 
-# optional equality constraint
-g2 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
-g2.model.weight.data = torch.eye(2)
-g2.model.bias.data = torch.zeros(2)
-
 # inequality constraints (list of functions)
 gI = [ObjectiveOrConstraint(g, dim_out=1)]
-# optional for testing: equality constraints (list of functions)
+
+# equality constraints
 gE = []
+
+# Optional equality constraint (for testing and education purpose)
+# g2 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
+# g2.model.weight.data = torch.eye(2)
+# g2.model.bias.data = torch.zeros(2)
 # gE = [g2]
 
 xstar = np.array([1 / np.sqrt(2), 0.5])  # solution

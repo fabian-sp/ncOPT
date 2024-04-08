@@ -1,7 +1,14 @@
 # ncOPT
-This repository contains a `Python` implementation of the SQP-GS (*Sequential Quadratic Programming - Gradient Sampling*) algorithm by Curtis and Overton [1]. 
 
-**Note:** this implementation is a **prototype code**, it has been tested only for a simple problem and it is not performance-optimized. A Matlab implementation is available from the authors of the paper, see [2].
+This repository is designed for solving constrained optimization problems where objetive and/or constraint functions are Pytorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
+
+As main solver, this repository contains a `Python` implementation of the SQP-GS (*Sequential Quadratic Programming - Gradient Sampling*) algorithm by Curtis and Overton [1]. 
+
+**DISCLAIMER:** 
+
+1) This implementation is a **prototype code**, it has been tested only for a simple problem and it is not (yet) performance-optimized.
+2) The implemented solver is designed for nonsmooth, nonconvex problems, and as such, can solve a very general problem class. If your problem has a specific structure (e.g. convexity), then you will almost certainly get better performance by using software/solvers that make use of this structure. As starting point, check out [`cvxpy`](https://www.cvxpy.org/).
+3) The main algorithm SQP-GS has been developed by Curtis and Overton in [1]. A Matlab implementation is available from the authors of the paper, see [2].
 
 ## Installation
 
@@ -21,16 +28,7 @@ The algorithm can solve problems of the form
          h(x) = 0
 ```
 
-where `f`, `g` and `h` are locally Lipschitz functions. Hence, the algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to the original paper.
-
-## Example
-
-The code was tested for a 2-dim nonsmooth version of the Rosenbrock function, constrained with a maximum function. See Example 5.1 in [1]. For this problem, the analytical solution is known. The picture below shows the trajectory of SQP-GS for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
-
-To reproduce this experiment, see the file `example_rosenbrock.py`.
-
-![SQP-GS trajectories for a 2-dim example](data/img/rosenbrock.png "SQP-GS trajectories for a 2-dim example")
-
+where `f`, `g` and `h` are locally Lipschitz functions. The SQP-GS algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to the original paper.
 
 ## Implementation details
 The solver can be called via 
@@ -40,21 +38,34 @@ The solver can be called via
     problem = SQPGS(f, gI, gE)
     problem.solve()
 ```
-It has three main arguments, called `f`, `gI` and `gE`. `f` is the objective. `gI` and `gE` are lists of inequality and equality constraint functions. Each element of `gI` and `gE` as well as the objective `f` needs to be an instance of a class which contains the following properties. The constraint functions are allowed to have multi-dimensional output.
+The three main arguments, called `f`, `gI` and `gE`, are the objective, the inequality and equality constaints respectively. Each argument should be passed as a list of instances of `ncopt.functions.ObjectiveOrConstraint` (see example below). 
 
-### Attributes
+* Each constraint function is allowed to have multi-dimensional output (see example below).
+* An empty list can be passed if no (in)equality constraints are needed.
 
-* `self.dim`: integer, specifies dimension of the input argument.
-* `self.dimOut`: integer, specifies dimension of the output.
+For example, a linear constraint function `Ax <= b` could be implmented as follows:
 
-### Methods
+```python
+    from ncopt.functions import ObjectiveOrConstraint
+    A = ..                      # your data
+    b = ..                      # your data
+    g = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
+    g.model.weight.data = A    # pass A
+    g.model.bias.data = -b     # pass b
+```
 
-* `self.eval`: evaluates the function at a point `x`.
-* `self.grad`: evaluates the gradient at a point `x`. Here, the Jacobian must be returned, i.e. an array of shape `dimOut x dim`.
+Note the argument `dim_out`, which needs to be passed for all constraint functions: it tells the solver what the output dimension of this constraint is.
 
-For an example, see the classes defined in `ncopt/funs.py`.
-Moreover, we implemented a class for a constraint coming from a Pytorch neural network (i.e. `g_i(x)` is an already trained neural network). For this, see `ncopt/torch_obj.py`.
+The main function class is `ncopt.functions.ObjectiveOrConstraint`. It is a simple wrapper around a given Pytorch module (e.g. the checkpoint of your trained network). We can evaluate the function and compute gradient using the standard Pytorch `autograd` functionalities. 
 
+
+## Example
+
+The code was tested for a 2-dim nonsmooth version of the Rosenbrock function, constrained with a maximum function. See Example 5.1 in [1]. For this problem, the analytical solution is known. The picture below shows the trajectory of SQP-GS for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
+
+To reproduce this experiment, see the file `example_rosenbrock.py`.
+
+![SQP-GS trajectories for a 2-dim example](data/img/rosenbrock.png "SQP-GS trajectories for a 2-dim example")
 
 
 ## References
