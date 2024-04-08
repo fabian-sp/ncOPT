@@ -1,6 +1,6 @@
 # ncOPT
 
-This repository is designed for solving constrained optimization problems where objetive and/or constraint functions are Pytorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
+This repository is designed for solving constrained optimization problems where objective and/or constraint functions are Pytorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
 
 As main solver, this repository contains a `Python` implementation of the SQP-GS (*Sequential Quadratic Programming - Gradient Sampling*) algorithm by Curtis and Overton [1]. 
 
