@@ -19,6 +19,7 @@ import numpy as np
 import torch
 
 from ncopt.functions import ObjectiveOrConstraint
+from ncopt.plot_utils import plot_metrics, plot_timings
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
 from ncopt.utils import compute_batch_jacobian_vmap, get_logger
 
@@ -100,6 +101,14 @@ class SQPGS:
         else:
             self.x_k = x0.copy()
 
+    def plot_timings(self, ax=None):
+        fig, ax = plot_timings(self.info["timings"], ax=ax)
+        return fig, ax
+
+    def plot_metrics(self, ax=None):
+        fig, ax = plot_metrics(self.info["metrics"], self.log_every, ax=ax)
+        return fig, ax
+
     def solve(self):
         ###############################################################
         # Set all hyperparameters
@@ -146,7 +155,14 @@ class SQPGS:
         do_step = False
 
         x_hist = [self.x_k] if self.store_history else None
-        timings = {"total": [], "sample_and_grad": [], "step": [], "sp_update": [], "sp_solve": []}
+        timings = {
+            "total": [],
+            "sample_and_grad": [],
+            "step": [],
+            "sp_update": [],
+            "sp_solve": [],
+            "other": [],
+        }
         metrics = {
             "objective": [],
             "constraint_violation": [],
@@ -224,6 +240,7 @@ class SQPGS:
             timings["sp_update"].append(self.SP.setup_time)
             timings["sp_solve"].append(self.SP.solve_time)
 
+            t02 = time.perf_counter()
             d_k = self.SP.d.value.copy()
             # compute g_k from paper
             g_k = (
@@ -236,7 +253,6 @@ class SQPGS:
             v_k = np.maximum(gI_k, 0).sum() + np.sum(np.abs(gE_k))
             phi_k = rho * f_k + v_k
             delta_q = phi_k - q_rho(d_k, rho, H, f_k, gI_k, gE_k, D_f, D_gI, D_gE)
-
             assert (
                 delta_q >= -self.assert_tol
             ), f"Value is supposed to be non-negative, but is {delta_q}."
@@ -268,7 +284,7 @@ class SQPGS:
             ##############################################
             # Step
             ##############################################
-            t02 = time.perf_counter()
+            t04 = time.perf_counter()
             do_step = delta_q > nu * eps**2  # Flag whether step is taken or not
             if do_step:
                 alpha = 1.0
@@ -333,7 +349,8 @@ class SQPGS:
             t1 = time.perf_counter()
             timings["total"].append(t1 - t0)
             timings["sample_and_grad"].append(t01 - t0)
-            timings["step"].append(t1 - t02)
+            timings["other"].append(t04 - t02)
+            timings["step"].append(t1 - t04)
 
         ##############################################
         # End of loop
