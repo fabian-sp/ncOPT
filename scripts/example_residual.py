@@ -22,10 +22,9 @@ from ncopt.sqpgs import SQPGS
 # %%
 np.random.seed(1234)
 
-d = 90  # problem dimension
-m = 10  # number of samples
+d = 256  # problem dimension
+m = 32  # number of samples
 q = 1.0  # residual norm order
-
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -61,7 +60,7 @@ f = ObjectiveOrConstraint(obj, dim=d)
 gI = [ObjectiveOrConstraint(const, dim_out=1)]
 gE = []
 
-problem = SQPGS(f, gI, gE, x0=None, tol=1e-6, max_iter=200, verbose=True)
+problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=500, verbose=True)
 
 # %% Solve
 
@@ -74,5 +73,13 @@ x = problem.solve()
 fig, ax = problem.plot_timings()
 fig, ax = problem.plot_metrics()
 
-fig, ax = plt.subplots()
+
+# plot solution vs oracle
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.plot(oracle, c="k", lw=1, label="Oracle")
+ax.plot(x, c="steelblue", lw=2, label="Final iterate")
+ax.set_xlabel("Coordinate")
+ax.set_ylabel(r"$x_i$")
+fig.tight_layout()
+
 # %%
