@@ -428,6 +428,12 @@ def compute_value_and_jacobian(
     Tuple[Union[torch.tensor, np.ndarray], Union[torch.tensor, float]]
         Jacobian of shape (batch_size, dim), and output values of shape (batch_size, dim_out).
     """
+    # Observation:
+    # The jacobian is still computed correctly for compute_batch_jacobian_vmap,
+    # even if the model would output a tensor of shape (b,) instead of (b,1)
+    # We could make the solver more flexible to handle this case, but then might
+    # lose the ability to switch out compute_batch_jacobian_vmap
+
     jac, out = compute_batch_jacobian_vmap(f, X)
 
     if as_numpy:
@@ -569,8 +575,8 @@ class SubproblemSQPGS:
         H: np.ndarray,
         rho: float,
         D_f: np.ndarray,
-        D_gI: list[np.ndarray],
-        D_gE: list[np.ndarray],
+        D_gI: List[np.ndarray],
+        D_gE: List[np.ndarray],
         f_k: float,
         gI_k: np.ndarray,
         gE_k: np.ndarray,

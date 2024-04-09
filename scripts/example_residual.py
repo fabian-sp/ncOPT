@@ -50,7 +50,8 @@ const = NormResidual(params=(R, y), q=2, offset=delta)
 const.to(device)
 
 assert np.allclose(
-    const.forward(torch.from_numpy(oracle).type(torch.float32).reshape(1, -1)).item(), -delta
+    const.forward(torch.from_numpy(oracle).type(torch.float32).reshape(1, -1).to(device)).item(),
+    -delta,
 )
 
 # %% Set up problem
@@ -60,7 +61,9 @@ f = ObjectiveOrConstraint(obj, dim=d)
 gI = [ObjectiveOrConstraint(const, dim_out=1)]
 gE = []
 
-problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=500, verbose=True)
+options = {"num_points_obj": 5, "num_points_gI": 5}
+
+problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=500, options=options, verbose=True)
 
 # %% Solve
 
