@@ -146,7 +146,7 @@ class SQPGS:
         do_step = False
 
         x_hist = [self.x_k] if self.store_history else None
-        timings = {"total": [], "sp_update": [], "sp_solve": []}
+        timings = {"total": [], "sample_and_grad": [], "step": [], "sp_update": [], "sp_solve": []}
         metrics = {
             "objective": [],
             "constraint_violation": [],
@@ -214,6 +214,7 @@ class SQPGS:
             else:
                 gE_k = np.array([])
 
+            t01 = time.perf_counter()
             ##############################################
             # Subproblem solve
             ##############################################
@@ -267,7 +268,7 @@ class SQPGS:
             ##############################################
             # Step
             ##############################################
-
+            t02 = time.perf_counter()
             do_step = delta_q > nu * eps**2  # Flag whether step is taken or not
             if do_step:
                 alpha = 1.0
@@ -288,7 +289,7 @@ class SQPGS:
                     y_hist = np.roll(y_hist, 1, axis=1)
                     y_hist[:, 0] = y_k
 
-                    hH = np.eye(self.dim)
+                    H = np.eye(self.dim)
                     for l in np.arange(iter_H):
                         sl = s_hist[:, l]
                         yl = y_hist[:, l]
@@ -300,14 +301,12 @@ class SQPGS:
                         cond = cond1 and cond2
 
                         if cond:
-                            Hs = hH @ sl
-                            hH = (
-                                hH
+                            Hs = H @ sl
+                            H = (
+                                H
                                 - np.outer(Hs, Hs) / (sl @ Hs + 1e-16)
                                 + np.outer(yl, yl) / (yl @ sl + 1e-16)
                             )
-
-                    H = hH.copy()
 
                 ####################################
                 # Actual step
@@ -330,8 +329,11 @@ class SQPGS:
 
             if self.store_history:
                 x_hist.append(self.x_k)
+
             t1 = time.perf_counter()
             timings["total"].append(t1 - t0)
+            timings["sample_and_grad"].append(t01 - t0)
+            timings["step"].append(t1 - t02)
 
         ##############################################
         # End of loop
