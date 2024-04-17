@@ -158,9 +158,8 @@ class SQPGS:
         timings = {
             "total": [],
             "sample_and_grad": [],
+            "subproblem": [],
             "step": [],
-            "sp_update": [],
-            "sp_solve": [],
             "other": [],
         }
         metrics = {
@@ -230,17 +229,13 @@ class SQPGS:
             else:
                 gE_k = np.array([])
 
-            t01 = time.perf_counter()
             ##############################################
             # Subproblem solve
             ##############################################
-
+            t1 = time.perf_counter()
             self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+            t2 = time.perf_counter()
 
-            timings["sp_update"].append(self.SP.setup_time)
-            timings["sp_solve"].append(self.SP.solve_time)
-
-            t02 = time.perf_counter()
             d_k = self.SP.d.value.copy()
             # compute g_k from paper
             g_k = (
@@ -284,7 +279,7 @@ class SQPGS:
             ##############################################
             # Step
             ##############################################
-            t04 = time.perf_counter()
+            t3 = time.perf_counter()
             do_step = delta_q > nu * eps**2  # Flag whether step is taken or not
             if do_step:
                 alpha = 1.0
@@ -346,11 +341,12 @@ class SQPGS:
             if self.store_history:
                 x_hist.append(self.x_k)
 
-            t1 = time.perf_counter()
-            timings["total"].append(t1 - t0)
-            timings["sample_and_grad"].append(t01 - t0)
-            timings["other"].append(t04 - t02)
-            timings["step"].append(t1 - t04)
+            t4 = time.perf_counter()
+            timings["total"].append(t4 - t0)
+            timings["sample_and_grad"].append(t1 - t0)
+            timings["subproblem"].append(t2 - t1)
+            timings["other"].append(t3 - t2)
+            timings["step"].append(t4 - t3)
 
         ##############################################
         # End of loop
@@ -642,7 +638,7 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
-        problem.solve(solver=cp.CLARABEL)
+        problem.solve(solver=cp.CLARABEL, verbose=True)
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem
