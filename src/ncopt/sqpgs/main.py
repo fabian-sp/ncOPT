@@ -518,7 +518,7 @@ class SubproblemSQPGS:
         pI: np.ndarray,
         pE: np.ndarray,
         assert_tol: float,
-        solver: str,
+        solver: str = DEFAULT_OPTION.qp_solver,
     ) -> None:
         """
         dim : solution space dimension
@@ -647,7 +647,7 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
-        problem.solve(solver=self._qp_solver, verbose=False)
+        problem.solve(solver=self._qp_solver, verbose=True)
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem
