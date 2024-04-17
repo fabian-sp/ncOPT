@@ -233,7 +233,7 @@ class SQPGS:
             # Subproblem solve
             ##############################################
             t1 = time.perf_counter()
-            self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+            self.SP.solve(np.linalg.cholesky(H), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
             t2 = time.perf_counter()
 
             d_k = self.SP.d.value.copy()
@@ -568,7 +568,7 @@ class SubproblemSQPGS:
 
     def solve(
         self,
-        H: np.ndarray,
+        L: np.ndarray,
         rho: float,
         D_f: np.ndarray,
         D_gI: List[np.ndarray],
@@ -582,8 +582,8 @@ class SubproblemSQPGS:
 
         Parameters
 
-        H : array
-            Hessian approximation
+        L : array
+            Cholesky factor of Hessian approximation
         rho : float
             parameter
         D_f : array
@@ -621,7 +621,7 @@ class SubproblemSQPGS:
         if self.has_eq_constraints:
             r_E = cp.Variable(gE_k.size, nonneg=True)
 
-        objective = rho * z + (1 / 2) * cp.quad_form(d, H)
+        objective = rho * z + (1 / 2) * cp.sum_squares(L.T @ d)
 
         obj_constraint = f_k + D_f @ d <= z
         constraints = [obj_constraint]
@@ -638,7 +638,7 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
-        problem.solve(solver=cp.CLARABEL, verbose=True)
+        problem.solve(solver=cp.OSQP, verbose=True)
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem
