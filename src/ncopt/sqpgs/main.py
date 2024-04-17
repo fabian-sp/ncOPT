@@ -647,7 +647,7 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
-        problem.solve(solver=self._qp_solver, verbose=True)
+        problem.solve(solver=self._qp_solver, verbose=False)
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem
