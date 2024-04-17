@@ -61,7 +61,7 @@ f = ObjectiveOrConstraint(obj, dim=d)
 gI = [ObjectiveOrConstraint(const, dim_out=1)]
 gE = []
 
-options = {"num_points_obj": 5, "num_points_gI": 5}
+options = {"num_points_obj": 5, "num_points_gI": 5, "qp_solver": "osqp"}
 
 problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=500, options=options, verbose=True)
 
