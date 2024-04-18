@@ -1,6 +1,6 @@
 # ncOPT
 
-This repository is designed for solving constrained optimization problems where objective and/or constraint functions are Pytorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
+This repository is designed for solving constrained optimization problems where objective and/or constraint functions are PyTorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
 
 As main solver, this repository contains a `Python` implementation of the SQP-GS (*Sequential Quadratic Programming - Gradient Sampling*) algorithm by Curtis and Overton [1]. 
 
@@ -38,12 +38,12 @@ The solver can be called via
     problem = SQPGS(f, gI, gE)
     problem.solve()
 ```
-The three main arguments, called `f`, `gI` and `gE`, are the objective, the inequality and equality constaints respectively. Each argument should be passed as a list of instances of `ncopt.functions.ObjectiveOrConstraint` (see example below). 
+The three main arguments, called `f`, `gI` and `gE`, are the objective, the inequality and equality constrains respectively. Each argument should be passed as a list of instances of `ncopt.functions.ObjectiveOrConstraint` (see example below). 
 
 * Each constraint function is allowed to have multi-dimensional output (see example below).
 * An empty list can be passed if no (in)equality constraints are needed.
 
-For example, a linear constraint function `Ax <= b` could be implmented as follows:
+For example, a linear constraint function `Ax <= b` could be implemented as follows:
 
 ```python
     from ncopt.functions import ObjectiveOrConstraint
@@ -56,7 +56,7 @@ For example, a linear constraint function `Ax <= b` could be implmented as follo
 
 Note the argument `dim_out`, which needs to be passed for all constraint functions: it tells the solver what the output dimension of this constraint is.
 
-The main function class is `ncopt.functions.ObjectiveOrConstraint`. It is a simple wrapper around a given Pytorch module (e.g. the checkpoint of your trained network). We can evaluate the function and compute gradient using the standard Pytorch `autograd` functionalities. 
+The main function class is `ncopt.functions.ObjectiveOrConstraint`. It is a simple wrapper around a given PyTorch module (e.g. the checkpoint of your trained network). We can evaluate the function and compute gradient using the standard PyTorch `autograd` functionalities. 
 
 
 ## Example
