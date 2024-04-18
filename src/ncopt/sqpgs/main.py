@@ -141,7 +141,7 @@ class SQPGS:
         pE = np.repeat(pE_, self.dimE)
         ###############################################################
 
-        self.SP = SubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol)
+        self.SP = SubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol, self.options["qp_solver"])
 
         E_k = np.inf  # for stopping criterion
         x_kmin1 = None  # last iterate
@@ -507,10 +507,18 @@ def stop_criterion(gI, gE, g_k, SP, gI_k, gE_k, V_gI, V_gE, nI_, nE_):
 
 # %%
 
+CVXPY_SOLVER_DICT = {"osqp": cp.OSQP, "clarabel": cp.CLARABEL}
+
 
 class SubproblemSQPGS:
     def __init__(
-        self, dim: int, p0: np.ndarray, pI: np.ndarray, pE: np.ndarray, assert_tol: float
+        self,
+        dim: int,
+        p0: np.ndarray,
+        pI: np.ndarray,
+        pE: np.ndarray,
+        assert_tol: float,
+        solver: str = DEFAULT_OPTION.qp_solver,
     ) -> None:
         """
         dim : solution space dimension
@@ -528,6 +536,7 @@ class SubproblemSQPGS:
 
         self.d = cp.Variable(self.dim)
         self._problem = None
+        self._qp_solver = CVXPY_SOLVER_DICT.get(solver, cp.OSQP)
 
     @property
     def nI(self) -> int:
@@ -638,7 +647,7 @@ class SubproblemSQPGS:
             objective = objective + cp.sum(r_E)
 
         problem = cp.Problem(cp.Minimize(objective), constraints)
-        problem.solve(solver=cp.OSQP, verbose=True)
+        problem.solve(solver=self._qp_solver, verbose=False)
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem

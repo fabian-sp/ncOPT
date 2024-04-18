@@ -32,6 +32,7 @@ _option_defaults = {
     "num_points_obj": 2,
     "num_points_gI": 3,
     "num_points_gE": 4,
+    "qp_solver": "osqp",
 }
 
 DEFAULT_ARG = Dotdict(_defaults)
