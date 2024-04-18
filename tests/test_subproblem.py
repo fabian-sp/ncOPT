@@ -2,21 +2,21 @@ import cvxpy as cp
 import numpy as np
 import pytest
 
-from ncopt.sqpgs.main import SubproblemSQPGS
+from ncopt.sqpgs.cvxpy_subproblem import CVXPYSubproblemSQPGS
 
 
 @pytest.fixture
-def subproblem_ineq() -> SubproblemSQPGS:
+def subproblem_ineq() -> CVXPYSubproblemSQPGS:
     dim = 2
     p0 = 2
     pI = np.array([3])
     pE = np.array([], dtype=int)
     assert_tol = 1e-5
-    subproblem = SubproblemSQPGS(dim, p0, pI, pE, assert_tol)
+    subproblem = CVXPYSubproblemSQPGS(dim, p0, pI, pE, assert_tol)
     return subproblem
 
 
-def test_subproblem_ineq(subproblem_ineq: SubproblemSQPGS):
+def test_subproblem_ineq(subproblem_ineq: CVXPYSubproblemSQPGS):
     D_f = np.array([[-2.0, 1.0], [-2.04236205, -1.0], [-1.92172864, -1.0]])
     D_gI = [np.array([[0.0, 2.0], [0.0, 2.0], [1.41421356, 0.0], [1.41421356, 0.0]])]
     subproblem_ineq.solve(
@@ -34,17 +34,17 @@ def test_subproblem_ineq(subproblem_ineq: SubproblemSQPGS):
 
 
 @pytest.fixture
-def subproblem_eq() -> SubproblemSQPGS:
+def subproblem_eq() -> CVXPYSubproblemSQPGS:
     dim = 2
     p0 = 2
     pI = np.array([], dtype=int)
     pE = np.array([4, 4])
     assert_tol = 1e-5
-    subproblem = SubproblemSQPGS(dim, p0, pI, pE, assert_tol)
+    subproblem = CVXPYSubproblemSQPGS(dim, p0, pI, pE, assert_tol)
     return subproblem
 
 
-def test_subproblem_eq(subproblem_eq: SubproblemSQPGS):
+def test_subproblem_eq(subproblem_eq: CVXPYSubproblemSQPGS):
     D_gE = [
         np.array([[1.0, 0.0], [1.0, 0.0], [1.0, 0.0], [1.0, 0.0], [1.0, 0.0]]),
         np.array([[0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0]]),
