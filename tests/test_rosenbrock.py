@@ -15,11 +15,9 @@ g = MaxOfLinear(
     params=(torch.diag(torch.tensor([torch.sqrt(torch.tensor(2.0)), 2.0])), -torch.ones(2))
 )
 
-np.random.seed(12345)
-torch.manual_seed(12345)
-
 
 def test_rosenbrock_from_zero():
+    torch.manual_seed(1)
     gI = [ObjectiveOrConstraint(g, dim_out=1)]
     gE = []
     xstar = np.array([1 / np.sqrt(2), 0.5])
@@ -29,6 +27,7 @@ def test_rosenbrock_from_zero():
 
 
 def test_rosenbrock_from_rand():
+    torch.manual_seed(1)
     gI = [ObjectiveOrConstraint(g, dim_out=1)]
     gE = []
     xstar = np.array([1 / np.sqrt(2), 0.5])
@@ -40,6 +39,7 @@ def test_rosenbrock_from_rand():
 
 
 def test_rosenbrock_with_eq():
+    torch.manual_seed(12)
     g1 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
     g1.model.weight.data = torch.eye(2)
     g1.model.bias.data = -torch.ones(2)

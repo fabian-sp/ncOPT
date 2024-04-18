@@ -20,7 +20,7 @@ def test_subproblem_ineq(subproblem_ineq: SubproblemSQPGS):
     D_f = np.array([[-2.0, 1.0], [-2.04236205, -1.0], [-1.92172864, -1.0]])
     D_gI = [np.array([[0.0, 2.0], [0.0, 2.0], [1.41421356, 0.0], [1.41421356, 0.0]])]
     subproblem_ineq.solve(
-        H=np.eye(2, dtype=float),
+        L=np.eye(2, dtype=float),
         rho=0.1,
         D_f=D_f,
         D_gI=D_gI,
@@ -50,7 +50,7 @@ def test_subproblem_eq(subproblem_eq: SubproblemSQPGS):
         np.array([[0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0], [0.0, 1.0]]),
     ]
     subproblem_eq.solve(
-        H=np.eye(2, dtype=float),
+        L=np.eye(2, dtype=float),
         rho=0.1,
         D_f=np.array([-2.0, 1.0]),
         D_gI=[],
