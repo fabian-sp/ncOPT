@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from ncopt.sqpgs.cvxpy_subproblem import CVXPYSubproblemSQPGS
+from ncopt.sqpgs.osqp_subproblem import OSQPSubproblemSQPGS
 
 
 @pytest.fixture
@@ -61,3 +62,42 @@ def test_subproblem_eq(subproblem_eq: CVXPYSubproblemSQPGS):
     )
     assert subproblem_eq.status == cp.OPTIMAL
     assert np.isclose(subproblem_eq.objective_val, 1.0)
+
+
+def test_subproblem_consistency():
+    dim = 2
+    p0 = 2
+    pI = np.array([3])
+    pE = np.array([], dtype=int)
+    assert_tol = 1e-5
+    subproblem = CVXPYSubproblemSQPGS(dim, p0, pI, pE, assert_tol)
+    subproblem2 = OSQPSubproblemSQPGS(dim, p0, pI, pE, assert_tol)
+    D_f = np.array([[-2.0, 1.0], [-2.04236205, -1.0], [-1.92172864, -1.0]])
+    D_gI = [np.array([[0.0, 2.0], [0.0, 2.0], [1.41421356, 0.0], [1.41421356, 0.0]])]
+
+    subproblem.solve(
+        L=np.eye(2, dtype=float),
+        rho=0.1,
+        D_f=D_f,
+        D_gI=D_gI,
+        D_gE=[],
+        f_k=1.0,
+        gI_k=np.array([-1.0]),
+        gE_k=np.array([], dtype=float),
+    )
+
+    subproblem2.solve(
+        H=np.eye(2, dtype=float),
+        rho=0.1,
+        D_f=D_f,
+        D_gI=D_gI,
+        D_gE=[],
+        f_k=1.0,
+        gI_k=np.array([-1.0]),
+        gE_k=np.array([], dtype=float),
+    )
+
+    assert np.allclose(subproblem.d, subproblem2.d)
+    assert np.allclose(subproblem.lambda_f, subproblem2.lambda_f)
+    assert np.allclose(subproblem.lambda_gI, subproblem2.lambda_gI)
+    assert np.allclose(subproblem.lambda_gE, subproblem2.lambda_gE)

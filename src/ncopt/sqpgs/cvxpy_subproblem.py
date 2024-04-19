@@ -121,7 +121,7 @@ class CVXPYSubproblemSQPGS:
 
         """
 
-        d = self.d
+        d = cp.Variable(self.dim)
         z = cp.Variable()
         if self.has_ineq_constraints:
             r_I = cp.Variable(gI_k.size, nonneg=True)
@@ -149,6 +149,9 @@ class CVXPYSubproblemSQPGS:
 
         assert problem.status in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}
         self._problem = problem
+
+        # Extract primal solution
+        self.d = d.value.copy()
 
         # Extract dual variables
         duals = problem.solution.dual_vars

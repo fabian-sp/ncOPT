@@ -21,6 +21,7 @@ from ncopt.functions import ObjectiveOrConstraint
 from ncopt.plot_utils import plot_metrics, plot_timings
 from ncopt.sqpgs.cvxpy_subproblem import CVXPYSubproblemSQPGS
 from ncopt.sqpgs.defaults import DEFAULT_ARG, DEFAULT_OPTION
+from ncopt.sqpgs.osqp_subproblem import OSQPSubproblemSQPGS
 from ncopt.utils import compute_batch_jacobian_vmap, get_logger
 
 
@@ -141,9 +142,12 @@ class SQPGS:
         pE = np.repeat(pE_, self.dimE)
         ###############################################################
 
-        self.SP = CVXPYSubproblemSQPGS(
-            self.dim, p0, pI, pE, self.assert_tol, self.options["qp_solver"]
-        )
+        if self.options["qp_solver"] == "osqp":
+            self.SP = OSQPSubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol)
+        else:
+            self.SP = CVXPYSubproblemSQPGS(
+                self.dim, p0, pI, pE, self.assert_tol, self.options["qp_solver"]
+            )
 
         E_k = np.inf  # for stopping criterion
         x_kmin1 = None  # last iterate
@@ -235,10 +239,14 @@ class SQPGS:
             # Subproblem solve
             ##############################################
             t1 = time.perf_counter()
-            self.SP.solve(np.linalg.cholesky(H), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+            if isinstance(self.SP, OSQPSubproblemSQPGS):
+                self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+            else:
+                self.SP.solve(np.linalg.cholesky(H), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+
+            d_k = self.SP.d.copy()
             t2 = time.perf_counter()
 
-            d_k = self.SP.d.value.copy()
             # compute g_k from paper
             g_k = (
                 self.SP.lambda_f @ D_f

@@ -56,18 +56,6 @@ class OSQPSubproblemSQPGS:
     def status(self) -> str:
         return self.problem.status
 
-    @property
-    def objective_val(self) -> float:
-        return self.problem.value
-
-    @property
-    def setup_time(self) -> float:
-        return self.problem.solver_stats.setup_time
-
-    @property
-    def solve_time(self) -> float:
-        return self.problem.solver_stats.solve_time
-
     def _initialize(self):
         """
         The quadratic subrpoblem we solve in every iteration is of the form:
@@ -253,10 +241,22 @@ class OSQPSubproblemSQPGS:
 
         problem = osqp.OSQP()
 
-        problem.setup(P=sparse.csc_matrix(self.P), q=self.q, A=sparse.csc_matrix(A), l=l, u=u)
+        problem.setup(
+            P=sparse.csc_matrix(self.P),
+            q=self.q,
+            A=sparse.csc_matrix(A),
+            l=l,
+            u=u,
+            eps_abs=1e-05,
+            eps_rel=1e-05,
+            verbose=False,
+            polish=1,
+        )
 
         res = problem.solve()
-        # TODO: assert status, where is it stored in OSQP?
+
+        assert res.info.status not in ["unsolved"]
+        print(res.info.status)
         self._problem = problem
 
         primal_solution = res.x
@@ -266,12 +266,6 @@ class OSQPSubproblemSQPGS:
 
         self.rI = primal_solution[self.dim + 1 : self.dim + 1 + self.nI]
         self.rE = primal_solution[self.dim + 1 + self.nI :]
-
-        # TODO: pipe through assert_tol
-        assert len(self.rE) == self.nE
-        assert len(self.rI) == self.nI
-        # assert np.all(self.rI >= -1e-5) , f"{self.rI}"
-        # assert np.all(self.rE >= -1e-5), f"{self.rE}"
 
         # extract dual variables = KKT multipliers
         dual_solution = res.y
