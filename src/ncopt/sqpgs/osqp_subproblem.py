@@ -4,6 +4,14 @@ import numpy as np
 import osqp
 from scipy import sparse
 
+# see: https://osqp.org/docs/interfaces/status_values.html
+OSQP_ALLOWED_STATUS = [
+    "solved",
+    "solved inaccurate",
+    "maximum iterations reached",
+    "run time limit reached",
+]
+
 
 class OSQPSubproblemSQPGS:
     def __init__(
@@ -255,8 +263,7 @@ class OSQPSubproblemSQPGS:
 
         res = problem.solve()
 
-        assert res.info.status not in ["unsolved"]
-        print(res.info.status)
+        assert res.info.status in OSQP_ALLOWED_STATUS, f"OSQP results in status {res.info.status}."
         self._problem = problem
 
         primal_solution = res.x

@@ -5,7 +5,7 @@ import numpy as np
 
 from ncopt.sqpgs.defaults import DEFAULT_OPTION
 
-CVXPY_SOLVER_DICT = {"osqp": cp.OSQP, "clarabel": cp.CLARABEL}
+CVXPY_SOLVER_DICT = {"osqp-cvxpy": cp.OSQP, "clarabel": cp.CLARABEL}
 
 
 class CVXPYSubproblemSQPGS:

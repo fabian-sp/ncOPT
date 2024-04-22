@@ -238,11 +238,21 @@ class SQPGS:
             ##############################################
             # Subproblem solve
             ##############################################
+            _reg_H = 1e-04
             t1 = time.perf_counter()
             if isinstance(self.SP, OSQPSubproblemSQPGS):
-                self.SP.solve(H, rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+                self.SP.solve(H + _reg_H * np.eye(self.dim), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
             else:
-                self.SP.solve(np.linalg.cholesky(H), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
+                self.SP.solve(
+                    np.linalg.cholesky(H + _reg_H * np.eye(self.dim)),
+                    rho,
+                    D_f,
+                    D_gI,
+                    D_gE,
+                    f_k,
+                    gI_k,
+                    gE_k,
+                )
 
             d_k = self.SP.d.copy()
             t2 = time.perf_counter()
