@@ -238,7 +238,7 @@ class SQPGS:
             ##############################################
             # Subproblem solve
             ##############################################
-            _reg_H = 1e-04
+            _reg_H = self.options["reg_H"]
             t1 = time.perf_counter()
             if isinstance(self.SP, OSQPSubproblemSQPGS):
                 self.SP.solve(H + _reg_H * np.eye(self.dim), rho, D_f, D_gI, D_gE, f_k, gI_k, gE_k)
