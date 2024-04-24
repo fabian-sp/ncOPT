@@ -28,12 +28,17 @@ class ObjectiveOrConstraint(torch.nn.Module):
         self.prepare_inputs = prepare_inputs
         self.is_differentiable = is_differentiable
 
-        # If no device is provided, set it to the same as the first model parameter
-        # this might fail for distributed models
+        # If no device is provided, set it to the same as the model parameters
         # if model has no parameters, we set device to cpu
         if not self.device:
             if sum(p.numel() for p in model.parameters() if p.requires_grad) > 0:
-                self.device = next(model.parameters()).device
+                devices = {p.device for p in model.parameters()}
+                if len(devices) == 1:
+                    self.device = devices.pop()
+                else:
+                    raise KeyError(
+                        "Model parameters lie on more than one device. Currently not supported."
+                    )
             else:
                 self.device = torch.device("cpu")
 
