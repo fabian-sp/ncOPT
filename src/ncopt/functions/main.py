@@ -32,7 +32,7 @@ class ObjectiveOrConstraint(torch.nn.Module):
         # if model has no parameters, we set device to cpu
         if not self.device:
             if sum(p.numel() for p in model.parameters() if p.requires_grad) > 0:
-                devices = set([p.device for p in model.parameters()])
+                devices = {p.device for p in model.parameters()}
                 if len(devices) == 1:
                     self.device = devices.pop()
                 else:
