@@ -128,7 +128,12 @@ class SQPGS:
         xi_sy = self.options["xi_sy"]
         iter_H = self.options["iter_H"]
 
-        p0 = self.options["num_points_obj"]  # sample points for objective
+        ###############################################################
+        # Construct number of sample point arrays
+
+        # sample points for objective
+        p0 = self.options["num_points_obj"] if not self.f.is_differentiable else 0
+
         pI_ = self.options["num_points_gI"] * np.ones(
             self.nI_, dtype=int
         )  # sample points for ineq constraint
@@ -136,7 +141,12 @@ class SQPGS:
             self.nE_, dtype=int
         )  # sample points for eq constraint
 
-        # TODO: if functon is differentiable, set to zero here
+        # if function is differentiable, set to zero here --> only sample at x_k
+        _is_differentiable_I = [g.is_differentiable for g in self.gI]
+        _is_differentiable_E = [g.is_differentiable for g in self.gE]
+
+        pI_[_is_differentiable_I] = 0
+        pE_[_is_differentiable_E] = 0
 
         pI = np.repeat(pI_, self.dimI)
         pE = np.repeat(pE_, self.dimE)
@@ -198,6 +208,7 @@ class SQPGS:
                 B_j = sample_points(self.x_k, eps, pE_[j], stack_x=True)
                 B_gE.append(B_j)
 
+            print(B_gI)
             ####################################
             # Compute gradients and evaluate
             ###################################
