@@ -28,7 +28,7 @@ from ncopt.utils import compute_batch_jacobian_vmap, get_logger
 class SQPGS:
     def __init__(
         self,
-        f: List[ObjectiveOrConstraint],
+        f: ObjectiveOrConstraint,
         gI: List[ObjectiveOrConstraint],
         gE: List[ObjectiveOrConstraint],
         x0: Optional[np.array] = None,
@@ -90,6 +90,8 @@ class SQPGS:
         self.nI = sum(self.dimI)  # number of inequality costraints
         self.nE = sum(self.dimE)  # number of equality costraints
 
+        # Construct number of sample point arrays
+        self.p0, self.pI_, self.pE_ = self._init_sample_points()
         ###############################################################
         # Initialize
 
@@ -101,6 +103,26 @@ class SQPGS:
             self.x_k = np.zeros(self.dim)
         else:
             self.x_k = x0.copy()
+
+    def _init_sample_points(self):
+        # sample points for objective
+        p0 = self.options["num_points_obj"] if not self.f.is_differentiable else 0
+
+        pI_ = self.options["num_points_gI"] * np.ones(
+            self.nI_, dtype=int
+        )  # sample points for ineq constraint
+        pE_ = self.options["num_points_gE"] * np.ones(
+            self.nE_, dtype=int
+        )  # sample points for eq constraint
+
+        # if function is differentiable, set to zero here --> only sample at x_k
+        _is_differentiable_I = [g.is_differentiable for g in self.gI]
+        _is_differentiable_E = [g.is_differentiable for g in self.gE]
+
+        pI_[_is_differentiable_I] = 0
+        pE_[_is_differentiable_E] = 0
+
+        return p0, pI_, pE_
 
     def plot_timings(self, ax=None):
         fig, ax = plot_timings(self.info["timings"], ax=ax)
@@ -129,28 +151,10 @@ class SQPGS:
         iter_H = self.options["iter_H"]
 
         ###############################################################
-        # Construct number of sample point arrays
-
-        # sample points for objective
-        p0 = self.options["num_points_obj"] if not self.f.is_differentiable else 0
-
-        pI_ = self.options["num_points_gI"] * np.ones(
-            self.nI_, dtype=int
-        )  # sample points for ineq constraint
-        pE_ = self.options["num_points_gE"] * np.ones(
-            self.nE_, dtype=int
-        )  # sample points for eq constraint
-
-        # if function is differentiable, set to zero here --> only sample at x_k
-        _is_differentiable_I = [g.is_differentiable for g in self.gI]
-        _is_differentiable_E = [g.is_differentiable for g in self.gE]
-
-        pI_[_is_differentiable_I] = 0
-        pE_[_is_differentiable_E] = 0
-
-        pI = np.repeat(pI_, self.dimI)
-        pE = np.repeat(pE_, self.dimE)
-        ###############################################################
+        # helper arrays for subproblem
+        p0 = self.p0
+        pI = np.repeat(self.pI_, self.dimI)
+        pE = np.repeat(self.pE_, self.dimE)
 
         if self.options["qp_solver"] == "osqp":
             self.SP = OSQPSubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol)
@@ -200,12 +204,12 @@ class SQPGS:
 
             B_gI = list()
             for j in np.arange(self.nI_):
-                B_j = sample_points(self.x_k, eps, pI_[j], stack_x=True)
+                B_j = sample_points(self.x_k, eps, pI[j], stack_x=True)
                 B_gI.append(B_j)
 
             B_gE = list()
             for j in np.arange(self.nE_):
-                B_j = sample_points(self.x_k, eps, pE_[j], stack_x=True)
+                B_j = sample_points(self.x_k, eps, pE[j], stack_x=True)
                 B_gE.append(B_j)
 
             ####################################
