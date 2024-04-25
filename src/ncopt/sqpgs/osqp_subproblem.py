@@ -249,6 +249,13 @@ class OSQPSubproblemSQPGS:
 
         problem = osqp.OSQP()
 
+        # print(self.P)
+        # print(self.q)
+        # print(A)
+        # print(u)
+        # print("###")
+        # print(f_k)
+        # print(gI_k)
         problem.setup(
             P=sparse.csc_matrix(self.P),
             q=self.q,

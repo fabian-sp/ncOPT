@@ -208,7 +208,6 @@ class SQPGS:
                 B_j = sample_points(self.x_k, eps, pE_[j], stack_x=True)
                 B_gE.append(B_j)
 
-            print(B_gI)
             ####################################
             # Compute gradients and evaluate
             ###################################
@@ -394,12 +393,12 @@ class SQPGS:
         return self.x_k
 
 
-def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = True) -> torch.Tensor:
+def sample_points(x: np.ndarray, eps: float, n_points: int, stack_x: bool = True) -> torch.Tensor:
     """Sample ``n_points`` uniformly from the ``eps``-ball around ``x``.
 
     Parameters
     ----------
-    x : torch.Tensor
+    x : np.ndarray
         The centre of the ball.
     eps : float
         Sampling radius.
@@ -415,7 +414,7 @@ def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = Tr
     dim = len(x)
     if n_points == 0:
         # return only x
-        X = torch.empty(1, dim)
+        X = torch.zeros(1, dim)
     else:
         U = torch.randn(n_points, dim)
         norm_U = torch.linalg.norm(U, axis=1)
@@ -425,10 +424,7 @@ def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = Tr
         if stack_x:
             X = torch.vstack((torch.zeros(1, dim), X))
 
-    if isinstance(x, np.ndarray):
-        X += torch.from_numpy(x).reshape(1, -1)
-    else:
-        X += x.reshape(1, -1)
+    X += torch.from_numpy(x).reshape(1, -1)
     return X
 
 
