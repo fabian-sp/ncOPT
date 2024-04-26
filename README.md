@@ -1,26 +1,9 @@
 # ncOPT
 
-This repository is designed for solving constrained optimization problems where objective and/or constraint functions are Pytorch modules. It is mainly intended for optimization with pre-trained networks, but could be used for other purposes.
+## Short Description
+This repository is for solving **constrained optimization problems** where objective and/or constraint functions are (arbitrary) **Pytorch modules**. It is mainly intended for optimization with pre-trained networks, but might be useful also in other contexts.
 
-As main solver, this repository contains a `Python` implementation of the SQP-GS (*Sequential Quadratic Programming - Gradient Sampling*) algorithm by Curtis and Overton [1]. 
-
-**DISCLAIMER:** 
-
-1) This implementation is a **prototype code**, it has been tested only for a simple problem and it is not (yet) performance-optimized.
-2) The implemented solver is designed for nonsmooth, nonconvex problems, and as such, can solve a very general problem class. If your problem has a specific structure (e.g. convexity), then you will almost certainly get better performance by using software/solvers that make use of this structure. As starting point, check out [`cvxpy`](https://www.cvxpy.org/).
-3) The main algorithm SQP-GS has been developed by Curtis and Overton in [1]. A Matlab implementation is available from the authors of the paper, see [2].
-
-## Installation
-
-If you want to install an editable version of this package in your Python environment, run the command
-
-```
-    python -m pip install --editable .
-```
-
-## Mathematical description
-
-The algorithm can solve problems of the form
+The algorithms in this package can solve problems of the form
 
 ```
     min  f(x)
@@ -28,9 +11,39 @@ The algorithm can solve problems of the form
          h(x) = 0
 ```
 
-where `f`, `g` and `h` are locally Lipschitz functions. The SQP-GS algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to the original paper.
+where `f`, `g` and `h` are locally Lipschitz functions.
 
-## Implementation details
+The package supports:
+
+* models/functions on GPU
+* batched evaluation and Jacobian computation
+* ineqaulity and equality constraints, which can depend only on a subset of the optimization variable
+
+**DISCLAIMER:** 
+
+1) We have not (yet) extensively tested the solver on large-scale problems.  
+2) The implemented solver is designed for nonsmooth, nonconvex problems, and as such, can solve a very general problem class. If your problem has a specific structure (e.g. convexity), then you will almost certainly get better performance by using software/solvers that are specifically written for the respective problem type. As starting point, check out [`cvxpy`](https://www.cvxpy.org/).
+
+
+
+## Installation
+
+For an editable version of this package in your Python environment, run the command
+
+```
+    python -m pip install --editable .
+```
+
+
+## Main Solver 
+
+The main solver implemented in this package is called SQP-GS, and has been developed by Curtis and Overton in [1]. 
+The SQP-GS algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to [our documentation](src/ncopt/sqps/README.md) and the original paper [1].
+
+
+## Getting started
+
+### Solver interface
 The solver can be called via 
 
 ```python
@@ -38,12 +51,13 @@ The solver can be called via
     problem = SQPGS(f, gI, gE)
     problem.solve()
 ```
-The three main arguments, called `f`, `gI` and `gE`, are the objective, the inequality and equality constaints respectively. Each argument should be passed as a list of instances of `ncopt.functions.ObjectiveOrConstraint` (see example below). 
+Here `f` is the objective function, and `gI` and `gE` are a list of inequality and equality constaints. 
+The objective `f` and each element of `gI` and `gE` should be passed as an instance of [`ncopt.functions.ObjectiveOrConstraint`](src/ncopt/functions/main.py) (a simple wrapper around a `torch.nn.Module`). 
 
 * Each constraint function is allowed to have multi-dimensional output (see example below).
 * An empty list can be passed if no (in)equality constraints are needed.
 
-For example, a linear constraint function `Ax <= b` could be implmented as follows:
+For example, a linear constraint function `Ax - b <= 0` can be implemented as follows:
 
 ```python
     from ncopt.functions import ObjectiveOrConstraint
@@ -56,20 +70,14 @@ For example, a linear constraint function `Ax <= b` could be implmented as follo
 
 Note the argument `dim_out`, which needs to be passed for all constraint functions: it tells the solver what the output dimension of this constraint is.
 
-The main function class is `ncopt.functions.ObjectiveOrConstraint`. It is a simple wrapper around a given Pytorch module (e.g. the checkpoint of your trained network). We can evaluate the function and compute gradient using the standard Pytorch `autograd` functionalities. 
+### Example
 
-
-## Example
-
-The code was tested for a 2-dim nonsmooth version of the Rosenbrock function, constrained with a maximum function. See Example 5.1 in [1]. For this problem, the analytical solution is known. The picture below shows the trajectory of SQP-GS for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
-
-To reproduce this experiment, see the file `example_rosenbrock.py`.
+A full example for solving a nonsmooth Rosenbrock function, constrained with a maximum function can be found [here](example_rosenbrock.py). This example is taken from Example 5.1 in [1]. The picture below shows the trajectory of the SQP-GS solver for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
 
 ![SQP-GS trajectories for a 2-dim example](data/img/rosenbrock.png "SQP-GS trajectories for a 2-dim example")
+
 
 
 ## References
 [1] Frank E. Curtis and Michael L. Overton, A sequential quadratic programming algorithm for nonconvex, nonsmooth constrained optimization, 
 SIAM Journal on Optimization 2012 22:2, 474-500, https://doi.org/10.1137/090780201.
-
-[2] Frank E. Curtis and Michael L. Overton, MATLAB implementation of SLQP-GS, https://coral.ise.lehigh.edu/frankecurtis/software/.
