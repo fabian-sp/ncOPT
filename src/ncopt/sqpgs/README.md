@@ -16,14 +16,14 @@ x = problem.solve()
 
 Below we briefly describe the SQP-GS algorithm. **For more details on the algorithm, we refer to the paper [1].** The iteration cost of the algorithm splits mainly into two steps:
 
-1) Sample function value and gradient/Jacobian of each nonsmooth function at multiple points in a neighborhood of the current iterate.
+1) Evaluate and compute gradient/Jacobian for each function at multiple points in a neighborhood of the current iterate.
 
-2) SQP approximates the original problem in each iteration by a quadratic program (QP). We need to solve this QP to compute the update direction. 
+2) Approximate the original problem by a quadratic program (QP). Solve this QP to compute the update direction. 
 
-The technique in 1) is called Gradient Sampling (GS) and is a widely used, robust technique for handling nonsmooth objective or constraint functions. 
-As all functions are Pytorch modules in this package, step 1) amounts to batch evaluation and Jacobian computation. This can be done efficiently using the `autograd` functionalities of Pytorch.
+The technique in 1. is called Gradient Sampling (GS) and is a widely used, robust technique for handling nonsmooth objective or constraint functions. 
+As all functions are Pytorch modules in this package, this amounts to **batch evaluation and Jacobian computation**. This can be done efficiently using the `autograd` functionalities of Pytorch.
 
-For 2), we solve the QP with the package `osqp`. We also implement a general interface to `cvxpy`, which seems slightly slower due to overhead costs, but more flexible as the solver can be exchanged easily. 
+For 2., we solve the QP with the package `osqp`. We also implement a general interface to `cvxpy`, which seems slightly slower due to overhead costs, but more flexible as the solver can be exchanged easily. 
 Further, the quadratic approximation of SQP naturally involves an approximation of the Hessian, which is done in L-BFGS style.
 
 

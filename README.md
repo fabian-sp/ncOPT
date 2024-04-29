@@ -17,17 +17,20 @@ The package supports:
 
 * models/functions on GPU
 * batched evaluation and Jacobian computation
-* ineqaulity and equality constraints, which can depend only on a subset of the optimization variable
-
-Quick links:
-
-1) How to specify functions?
-2) How to call the solver?
-3) Advances options and infos for the SQPGS solver
+* inequality and equality constraints, which can depend only on a subset of the optimization variable
 
 
+#### Table of contents
 
-**DISCLAIMER:** 
+1. [Installation](#installation)
+2. [Getting started](#main-solver)
+    - [Solver interface](#solver-interface)
+    - [The `ObjectiveOrConstraint` class](#the-objectiveorconstraint-class)
+    - [Functionalities](#functionalities)
+3. [Examples](#examples)
+4. [References](#refernces)
+
+#### Disclaimer
 
 1) We have not (yet) extensively tested the solver on large-scale problems.  
 2) The implemented solver is designed for nonsmooth, nonconvex problems, and as such, can solve a very general problem class. If your problem has a specific structure (e.g. convexity), then you will almost certainly get better performance by using software/solvers that are specifically written for the respective problem type. As starting point, check out [`cvxpy`](https://www.cvxpy.org/).
@@ -42,16 +45,12 @@ For an editable version of this package in your Python environment, run the comm
     python -m pip install --editable .
 ```
 
-
-## Main Solver 
-
-The main solver implemented in this package is called SQP-GS, and has been developed by Curtis and Overton in [1]. 
-The SQP-GS algorithm can solve problems with nonconvex and nonsmooth objective and constraints. For details, we refer to [our documentation](src/ncopt/sqpgs/README.md) and the original paper [1].
-
-
 ## Getting started
 
 ### Solver interface
+
+The main solver implemented in this package is called SQP-GS, and has been developed by Curtis and Overton in [1]. See [the detailed documentation](src/ncopt/sqpgs/).
+
 The SQP-GS solver can be called via 
 
 ```python
@@ -80,7 +79,7 @@ For example, a linear constraint function `Ax - b <= 0` can be implemented as fo
     g.model.bias.data = -b     # pass b
 ```
 
-### More functionalities
+### Functionalities
 
 Let's assume we have a `torch.nn.Module`, call it `model`, which we want to use as objective/constraint. For the solver, we can pass the function as  
 
@@ -94,7 +93,7 @@ f = ObjectiveOrConstraint(model)
 
 * **Input preparation**: Different constraints might only need a part of the optimization variable as input, or might require additional preparation such as reshaping from vector to image. (Note that the optimization variable is handled always as vector) For this, you can specify a callable `prepare_input` when initializing a `ObjectiveOrConstraint` object. Any reshaping or cropping etc. can be handled with this function. Please note that `prepare_input` should be compatible with batched forward passes.
 
-### Example
+## Examples
 
 A full example for solving a nonsmooth Rosenbrock function, constrained with a maximum function can be found [here](example_rosenbrock.py). This example is taken from Example 5.1 in [1]. The picture below shows the trajectory of the SQP-GS solver for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
 
