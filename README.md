@@ -13,27 +13,28 @@ The algorithms in this package can solve problems of the form
 
 where `f`, `g` and `h` are locally Lipschitz functions.
 
-The package supports:
+Key functionalities of the package:
 
-* models/functions on GPU
-* batched evaluation and Jacobian computation
-* inequality and equality constraints, which can depend only on a subset of the optimization variable
+* forward and backward pass of functions can be done on GPU
+* batched evaluation and Jacobian computation using Pytorch's `autograd`; no gradient implementation needed
+* support for inequality *and* equality constraints; constraints can use only a subset of the optimization variable as input
 
 
-#### Table of contents
+### Table of contents
 
 1. [Installation](#installation)
-2. [Getting started](#main-solver)
+2. [Getting started](#getting-started)
     - [Solver interface](#solver-interface)
     - [The `ObjectiveOrConstraint` class](#the-objectiveorconstraint-class)
     - [Functionalities](#functionalities)
 3. [Examples](#examples)
-4. [References](#refernces)
+4. [References](#references)
 
-#### Disclaimer
+### Disclaimer
 
-1) We have not (yet) extensively tested the solver on large-scale problems.  
+1) We have not (yet) extensively tested the solver on large-scale problems.
 2) The implemented solver is designed for nonsmooth, nonconvex problems, and as such, can solve a very general problem class. If your problem has a specific structure (e.g. convexity), then you will almost certainly get better performance by using software/solvers that are specifically written for the respective problem type. As starting point, check out [`cvxpy`](https://www.cvxpy.org/).
+3) The solver is not guaranteed to converge to a (global) solution (see the theoretical results in [1] for convergence to local solutions under certain assumptions).
 
 
 
@@ -94,10 +95,33 @@ f = ObjectiveOrConstraint(model)
 * **Input preparation**: Different constraints might only need a part of the optimization variable as input, or might require additional preparation such as reshaping from vector to image. (Note that the optimization variable is handled always as vector) For this, you can specify a callable `prepare_input` when initializing a `ObjectiveOrConstraint` object. Any reshaping or cropping etc. can be handled with this function. Please note that `prepare_input` should be compatible with batched forward passes.
 
 ## Examples
+### 2D Nonsmooth Rosenbrock
 
-A full example for solving a nonsmooth Rosenbrock function, constrained with a maximum function can be found [here](example_rosenbrock.py). This example is taken from Example 5.1 in [1]. The picture below shows the trajectory of the SQP-GS solver for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
+This example is taken from Example 5.1 in [1] and involves minimizing a nonsmooth Rosenbrock function, constrained with a maximum function. The picture below shows the trajectory of the SQP-GS solver for different starting points. The final iterates are marked with the black plus while the analytical solution is marked with the golden star. We can see that the algorithm finds the minimizer consistently.
+
+[Link to example script](examples/example_rosenbrock.py)
 
 ![SQP-GS trajectories for a 2-dim example](data/img/rosenbrock.png "SQP-GS trajectories for a 2-dim example")
+
+### Sparse signal recovery
+
+This example is taken from Example 5.3 in [1]. We minimize the q-norm $\|x\|_q$ under the constraint of approximate signal recovery $\|Rx-y\| \leq \delta$. Here $R$ comes from the Discrete Cosine Transform.
+
+[Link to example script](examples/example_residual.py)
+
+### Pretrained neural network constraint
+
+This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max\{\sqrt{2}x_1, 2x_2\} -1 $. Then, we load the model checkpoint to use it as constraint.
+
+Below we show the feasible set (in blue), and the final iterate, if we use as objective the squared distance to the vector of ones.
+
+[Link to example script](examples/example_checkpoint.py)
+
+[Link to training script](scripts/train_max_fun.py)
+
+
+![SQP-GS final iterate with learned constraint](data/img/checkpoint.png "SQP-GS final iterate with learned constraint")
+
 
 
 
