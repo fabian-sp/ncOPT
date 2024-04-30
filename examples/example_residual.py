@@ -1,6 +1,4 @@
 """
-@author: Fabian Schaipp
-
 Implements Example 5.3 in
 
     Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
