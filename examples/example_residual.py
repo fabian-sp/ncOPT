@@ -72,6 +72,7 @@ x = problem.solve()
 # %% Plotting
 
 fig, ax = problem.plot_timings()
+fig.savefig("../data/img/timings_residual.png")
 fig, ax = problem.plot_metrics()
 
 

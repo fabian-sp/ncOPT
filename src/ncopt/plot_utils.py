@@ -23,7 +23,7 @@ def plot_timings(timings, ax=None):
             if None not in val:
                 summed += np.array(val)
 
-    ax.plot(summed, lw=1, ls="--", color="grey", label="summed")
+    # ax.plot(summed, lw=1, ls="--", color="grey", label="summed")
 
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Runtime [sec]")

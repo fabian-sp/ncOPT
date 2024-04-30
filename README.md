@@ -109,6 +109,12 @@ This example is taken from Example 5.3 in [1]. We minimize the q-norm $||x||_q$ 
 
 [Link to example script](examples/example_residual.py)
 
+When $q\geq 1$ the problem is convex and rather easy to solve. For $q<1$, we observed that the number of sample points need to be increased a lot in order to make the subproblems solvable in reasonable time.
+
+This problem has dimension 256, with one scalar constraint. To give a feeling for runtime, below is the runtime per iteration (for $q=1$), split into the main parts: sample points and compute gradients (`sample_and_grad`), solve the quadratic subproblem (`subproblem`), do the update step of iterate and approximate Hessian (`step`), and all other routines. 
+
+![Timings for SQP-GS with dim 256](data/img/timings_residual.png "Timings for SQP-GS with dim 256")
+
 ### Pretrained neural network constraint
 
 This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max(\sqrt{2}x_1, 2x_2) -1 $. Then, we load the model checkpoint to use it as constraint.
