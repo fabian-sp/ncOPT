@@ -92,7 +92,7 @@ f = ObjectiveOrConstraint(model)
 
 * **Device handling:** The forward pass, and Jacobian calculation is done on the device on which the parameters of your model. For example, you can use `model.to(device)` before creating `f`. See this [Colab example](https://colab.research.google.com/drive/1scsusR4Fggo-vT-IPYsoa3ccROmGQkZ8?usp=sharing) how to use a GPU.
 
-* **Input preparation**: Different constraints might only need a part of the optimization variable as input, or might require additional preparation such as reshaping from vector to image. (Note that the optimization variable is handled always as vector) For this, you can specify a callable `prepare_input` when initializing a `ObjectiveOrConstraint` object. Any reshaping or cropping etc. can be handled with this function. Please note that `prepare_input` should be compatible with batched forward passes.
+* **Input preparation**: Different constraints might only need a part of the optimization variable as input, or might require additional preparation such as reshaping from vector to image. (Note that the optimization variable is handled always as vector). For this, you can specify a callable `prepare_input` when initializing a `ObjectiveOrConstraint` object. Any reshaping or cropping etc. can be handled with this function. Please note that `prepare_input` should be compatible with batched forward passes.
 
 ## Examples
 ### 2D Nonsmooth Rosenbrock
@@ -105,13 +105,13 @@ This example is taken from Example 5.1 in [1] and involves minimizing a nonsmoot
 
 ### Sparse signal recovery
 
-This example is taken from Example 5.3 in [1]. We minimize the q-norm $\|x\|_q$ under the constraint of approximate signal recovery $\|Rx-y\| \leq \delta$. Here $R$ comes from the Discrete Cosine Transform.
+This example is taken from Example 5.3 in [1]. We minimize the q-norm $||x||_q$ under the constraint of approximate signal recovery $||Rx-y|| \leq \delta$. Here $R$ comes from the Discrete Cosine Transform.
 
 [Link to example script](examples/example_residual.py)
 
 ### Pretrained neural network constraint
 
-This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max\{\sqrt{2}x_1, 2x_2\} -1 $. Then, we load the model checkpoint to use it as constraint.
+This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max(\sqrt{2}x_1, 2x_2) -1 $. Then, we load the model checkpoint to use it as constraint.
 
 Below we show the feasible set (in blue), and the final iterate, if we use as objective the squared distance to the vector of ones.
 
