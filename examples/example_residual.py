@@ -22,7 +22,7 @@ np.random.seed(1234)
 
 d = 256  # problem dimension
 m = 32  # number of samples
-q = 1.0  # residual norm order
+q = 1.0  # residual norm order. Value less than 1.0 makes problem non-convex.
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -59,9 +59,13 @@ f = ObjectiveOrConstraint(obj, dim=d)
 gI = [ObjectiveOrConstraint(const, dim_out=1)]
 gE = []
 
-options = {"num_points_obj": 5, "num_points_gI": 5, "qp_solver": "osqp"}
+if q >= 1:
+    options = {"num_points_obj": 5, "num_points_gI": 5, "qp_solver": "osqp"}
+else:
+    # only tested for q=0.7
+    options = {"num_points_obj": 100, "num_points_gI": 100, "qp_solver": "osqp"}
 
-problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=500, options=options, verbose=True)
+problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=450, options=options, verbose=True)
 
 # %% Solve
 

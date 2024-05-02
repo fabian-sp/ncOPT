@@ -1,6 +1,4 @@
 """
-@author: Fabian Schaipp
-
 Implements the SQP-GS algorithm from
 
     Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
@@ -40,6 +38,47 @@ class SQPGS:
         store_history: bool = DEFAULT_ARG.store_history,
         log_every: int = DEFAULT_ARG.log_every,
     ) -> None:
+        """The problem object for using the SQP-GS method.
+
+        Parameters
+        ----------
+        f : ObjectiveOrConstraint
+            The objective funtion. Argument ``dim`` must be specified.
+            Output must be of shape ``(batch_size, 1)``.
+        gI : List[ObjectiveOrConstraint]
+            List of inequality constraint functions.
+            Argument ``dim_out`` must be specified for each.
+            Output must be of shape ``(batch_size, dim_out)``.
+            Pass empty list for no inequality constraints.
+        gE : List[ObjectiveOrConstraint]
+            List of equality constraint functions.
+            Argument ``dim_out`` must be specified for each.
+            Output must be of shape ``(batch_size, dim_out)``.
+            Pass empty list for no equality constraints.
+        x0 : Optional[np.array], optional
+            Starting point, by default vector of zeros.
+        tol : float, optional
+            Tolerance for stopping, measured by E_k in [Curtis and Overton, 2012].
+            By default DEFAULT_ARG.tol
+        max_iter : int, optional
+            Maximum number of iterations, by default DEFAULT_ARG.max_iter
+        verbose : bool, optional
+            Whether to print status updates, by default DEFAULT_ARG.verbose
+        options : dict, optional
+            Dictionary with options, by default {}.
+            All specified entries will overwrite the default value.
+            See ``./defaults.py`` for possible key names and default values.
+        assert_tol : float, optional
+            Assertion tolerance used in mathematical checks, by default DEFAULT_ARG.assert_tol
+            You can avoid errors raised by assertions by increasing this number.
+            Note that in that case, the algorihtm might be not producing correct output.
+        store_history : bool, optional
+            Whether to store the history of iterates in every iteration, by default False.
+            Only use this for small examples, as it might produce memory overflow.
+        log_every : int, optional
+            Frequency of status updates (if ``verbose=True``) by default DEFAULT_ARG.log_every
+
+        """
         if tol < 0:
             raise ValueError(f"Tolerance must be non-negative, but was specified as {tol}.")
         if max_iter < 0:
@@ -125,14 +164,54 @@ class SQPGS:
         return p0, pI_, pE_
 
     def plot_timings(self, ax=None):
+        """Plotting the timings of each algorithm step, over the course of iterations.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes._axes.Axes, optional
+            Axis to plot on, by default None.
+            If not specified, a new figure and axis will be created.
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            Figure object of the plot.
+        ax: matplotlib.axes._axes.Axes
+            Axis object of the plot
+        """
         fig, ax = plot_timings(self.info["timings"], ax=ax)
         return fig, ax
 
     def plot_metrics(self, ax=None):
+        """Plotting several metrics of each logged step, over the course of iterations.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes._axes.Axes, optional
+            Axis to plot on, by default None.
+            If not specified, a new figure and axis will be created.
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            Figure object of the plot.
+        ax: matplotlib.axes._axes.Axes
+            Axis object of the plot
+        """
         fig, ax = plot_metrics(self.info["metrics"], self.log_every, ax=ax)
         return fig, ax
 
-    def solve(self):
+    def solve(self) -> np.ndarray:
+        """Method for solving the problem.
+        All metrics and timings will be stored in ``self.info``.
+
+        Note that repeatedly calling this method will use the last iterate as new starting point.
+
+        Returns
+        -------
+        np.ndarray
+            The final iterate (also stored in ``self.x_k``).
+        """
         ###############################################################
         # Set all hyperparameters
 
