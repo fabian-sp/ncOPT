@@ -32,27 +32,27 @@ class ObjectiveOrConstraint(torch.nn.Module):
         Parameters
         ----------
         model : torch.nn.Module
-            The Pytorch module for evaluating the function
+            The Pytorch module for evaluating the function.
         dim : Optional[int], optional
             Input dimension of the function, by default None.
             Needs to be specified for objective functions for the solver.
         dim_out : int, optional
-            Output dimension of the function, by default 1
+            Output dimension of the function, by default 1.
             Needs to be specified for each constraint function for the solver.
         name : Optional[str], optional
             A name for the function, by default None.
             Not needed for solver, only for convenience.
         device : Optional[Union[str, torch.device]], optional
             A device for the forward pass, by default None.
-            You normall don't need to specify this: we automatically use the device
+            You normally don't need to specify this: we automatically use the device
             where the parameters of the model lie on.
             If you specify the device, please make sure, that the parameters of the model
             lie on the correct device.
         dtype : Optional[torch.dtype], optional
             Format to convert when evaluating a tensor that was converted
-            from ``np.ndarray``, by default torch.float32
+            from ``np.ndarray``, by default torch.float32.
         prepare_inputs : Optional[Callable], optional
-            Callable to prepare the model inpt, by default None
+            Callable to prepare the model inpt, by default None.
             Note that the solver always inputs the full optimization variable (as batch).
             If your function only needs a subset of the vector as input, or
             needs reshaping operations etc, then you can do this via this callable.

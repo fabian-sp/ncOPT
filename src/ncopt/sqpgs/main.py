@@ -59,24 +59,24 @@ class SQPGS:
             Starting point, by default vector of zeros.
         tol : float, optional
             Tolerance for stopping, measured by E_k in [Curtis and Overton, 2012].
-            By default DEFAULT_ARG.tol
+            By default DEFAULT_ARG.tol.
         max_iter : int, optional
-            Maximum number of iterations, by default DEFAULT_ARG.max_iter
+            Maximum number of iterations, by default DEFAULT_ARG.max_iter.
         verbose : bool, optional
-            Whether to print status updates, by default DEFAULT_ARG.verbose
+            Whether to print status updates, by default DEFAULT_ARG.verbose.
         options : dict, optional
             Dictionary with options, by default {}.
             All specified entries will overwrite the default value.
             See ``./defaults.py`` for possible key names and default values.
         assert_tol : float, optional
-            Assertion tolerance used in mathematical checks, by default DEFAULT_ARG.assert_tol
+            Assertion tolerance used in mathematical checks, by default DEFAULT_ARG.assert_tol.
             You can avoid errors raised by assertions by increasing this number.
             Note that in that case, the algorihtm might be not producing correct output.
         store_history : bool, optional
             Whether to store the history of iterates in every iteration, by default False.
             Only use this for small examples, as it might produce memory overflow.
         log_every : int, optional
-            Frequency of status updates (if ``verbose=True``) by default DEFAULT_ARG.log_every
+            Frequency of status updates (if ``verbose=True``) by default DEFAULT_ARG.log_every.
 
         """
         if tol < 0:
