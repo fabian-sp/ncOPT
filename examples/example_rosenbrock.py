@@ -1,5 +1,10 @@
 """
-@author: Fabian Schaipp
+Implements Example 5.1 in
+
+    Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
+    algorithm for nonconvex, nonsmooth constrained optimization,
+    SIAM Journal on Optimization 2012 22:2, 474-500, https://doi.org/10.1137/090780201.
+
 """
 
 import matplotlib.pyplot as plt
@@ -11,8 +16,6 @@ from ncopt.functions import ObjectiveOrConstraint
 from ncopt.functions.max_linear import MaxOfLinear
 from ncopt.functions.rosenbrock import NonsmoothRosenbrock
 from ncopt.sqpgs import SQPGS
-
-np.random.seed(1234)
 
 # %% Setup
 
@@ -37,7 +40,7 @@ xstar = np.array([1 / np.sqrt(2), 0.5])  # solution
 
 # %% How to use the solver
 
-problem = SQPGS(f, gI, gE, x0=None, tol=1e-6, max_iter=100, verbose=True)
+problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=100, verbose=True)
 x = problem.solve()
 
 print("Distance to solution:", f"{np.linalg.norm(x - xstar):.9f}")
@@ -60,15 +63,11 @@ fig, ax = plt.subplots(figsize=(5, 4))
 
 # Plot contour and solution
 ax.contourf(X, Y, Z, cmap="gist_heat", levels=20, alpha=0.7, antialiased=True, lw=0, zorder=0)
-# ax.contourf(X, Y, Z, colors='lightgrey', levels=20, alpha=0.7,
-#             antialiased=True, lw=0, zorder=0)
-# ax.contour(X, Y, Z, cmap='gist_heat', levels=8, alpha=0.7,
-#             antialiased=True, linewidths=4, zorder=0)
 ax.scatter(xstar[0], xstar[1], marker="*", s=200, c="gold", zorder=1)
 
 for i in range(7):
     x0 = np.random.randn(2)
-    problem = SQPGS(f, gI, gE, x0, tol=1e-6, max_iter=100, verbose=False, store_history=True)
+    problem = SQPGS(f, gI, gE, x0, tol=1e-10, max_iter=100, verbose=False, store_history=True)
     x_k = problem.solve()
     print(x_k)
 
@@ -90,4 +89,4 @@ legend_elements = [
 ax.legend(handles=legend_elements, ncol=3, fontsize=8)
 
 fig.tight_layout()
-fig.savefig("data/img/rosenbrock.png")
+fig.savefig("../data/img/rosenbrock.png")

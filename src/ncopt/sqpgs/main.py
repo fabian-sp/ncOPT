@@ -1,6 +1,4 @@
 """
-@author: Fabian Schaipp
-
 Implements the SQP-GS algorithm from
 
     Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
@@ -28,7 +26,7 @@ from ncopt.utils import compute_batch_jacobian_vmap, get_logger
 class SQPGS:
     def __init__(
         self,
-        f: List[ObjectiveOrConstraint],
+        f: ObjectiveOrConstraint,
         gI: List[ObjectiveOrConstraint],
         gE: List[ObjectiveOrConstraint],
         x0: Optional[np.array] = None,
@@ -40,6 +38,47 @@ class SQPGS:
         store_history: bool = DEFAULT_ARG.store_history,
         log_every: int = DEFAULT_ARG.log_every,
     ) -> None:
+        """The problem object for using the SQP-GS method.
+
+        Parameters
+        ----------
+        f : ObjectiveOrConstraint
+            The objective funtion. Argument ``dim`` must be specified.
+            Output must be of shape ``(batch_size, 1)``.
+        gI : List[ObjectiveOrConstraint]
+            List of inequality constraint functions.
+            Argument ``dim_out`` must be specified for each.
+            Output must be of shape ``(batch_size, dim_out)``.
+            Pass empty list for no inequality constraints.
+        gE : List[ObjectiveOrConstraint]
+            List of equality constraint functions.
+            Argument ``dim_out`` must be specified for each.
+            Output must be of shape ``(batch_size, dim_out)``.
+            Pass empty list for no equality constraints.
+        x0 : Optional[np.array], optional
+            Starting point, by default vector of zeros.
+        tol : float, optional
+            Tolerance for stopping, measured by E_k in [Curtis and Overton, 2012].
+            By default DEFAULT_ARG.tol.
+        max_iter : int, optional
+            Maximum number of iterations, by default DEFAULT_ARG.max_iter.
+        verbose : bool, optional
+            Whether to print status updates, by default DEFAULT_ARG.verbose.
+        options : dict, optional
+            Dictionary with options, by default {}.
+            All specified entries will overwrite the default value.
+            See ``./defaults.py`` for possible key names and default values.
+        assert_tol : float, optional
+            Assertion tolerance used in mathematical checks, by default DEFAULT_ARG.assert_tol.
+            You can avoid errors raised by assertions by increasing this number.
+            Note that in that case, the algorihtm might be not producing correct output.
+        store_history : bool, optional
+            Whether to store the history of iterates in every iteration, by default False.
+            Only use this for small examples, as it might produce memory overflow.
+        log_every : int, optional
+            Frequency of status updates (if ``verbose=True``) by default DEFAULT_ARG.log_every.
+
+        """
         if tol < 0:
             raise ValueError(f"Tolerance must be non-negative, but was specified as {tol}.")
         if max_iter < 0:
@@ -90,6 +129,8 @@ class SQPGS:
         self.nI = sum(self.dimI)  # number of inequality costraints
         self.nE = sum(self.dimE)  # number of equality costraints
 
+        # Construct number of sample point arrays
+        self.p0, self.pI_, self.pE_ = self._init_sample_points()
         ###############################################################
         # Initialize
 
@@ -102,15 +143,75 @@ class SQPGS:
         else:
             self.x_k = x0.copy()
 
+    def _init_sample_points(self):
+        # sample points for objective
+        p0 = self.options["num_points_obj"] if not self.f.is_differentiable else 0
+
+        pI_ = self.options["num_points_gI"] * np.ones(
+            self.nI_, dtype=int
+        )  # sample points for ineq constraint
+        pE_ = self.options["num_points_gE"] * np.ones(
+            self.nE_, dtype=int
+        )  # sample points for eq constraint
+
+        # if function is differentiable, set to zero here --> only sample at x_k
+        _is_differentiable_I = [g.is_differentiable for g in self.gI]
+        _is_differentiable_E = [g.is_differentiable for g in self.gE]
+
+        pI_[_is_differentiable_I] = 0
+        pE_[_is_differentiable_E] = 0
+
+        return p0, pI_, pE_
+
     def plot_timings(self, ax=None):
+        """Plotting the timings of each algorithm step, over the course of iterations.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes._axes.Axes, optional
+            Axis to plot on, by default None.
+            If not specified, a new figure and axis will be created.
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            Figure object of the plot.
+        ax: matplotlib.axes._axes.Axes
+            Axis object of the plot
+        """
         fig, ax = plot_timings(self.info["timings"], ax=ax)
         return fig, ax
 
     def plot_metrics(self, ax=None):
+        """Plotting several metrics of each logged step, over the course of iterations.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes._axes.Axes, optional
+            Axis to plot on, by default None.
+            If not specified, a new figure and axis will be created.
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            Figure object of the plot.
+        ax: matplotlib.axes._axes.Axes
+            Axis object of the plot
+        """
         fig, ax = plot_metrics(self.info["metrics"], self.log_every, ax=ax)
         return fig, ax
 
-    def solve(self):
+    def solve(self) -> np.ndarray:
+        """Method for solving the problem.
+        All metrics and timings will be stored in ``self.info``.
+
+        Note that repeatedly calling this method will use the last iterate as new starting point.
+
+        Returns
+        -------
+        np.ndarray
+            The final iterate (also stored in ``self.x_k``).
+        """
         ###############################################################
         # Set all hyperparameters
 
@@ -128,19 +229,11 @@ class SQPGS:
         xi_sy = self.options["xi_sy"]
         iter_H = self.options["iter_H"]
 
-        p0 = self.options["num_points_obj"]  # sample points for objective
-        pI_ = self.options["num_points_gI"] * np.ones(
-            self.nI_, dtype=int
-        )  # sample points for ineq constraint
-        pE_ = self.options["num_points_gE"] * np.ones(
-            self.nE_, dtype=int
-        )  # sample points for eq constraint
-
-        # TODO: if functon is differentiable, set to zero here
-
-        pI = np.repeat(pI_, self.dimI)
-        pE = np.repeat(pE_, self.dimE)
         ###############################################################
+        # helper arrays for subproblem
+        p0 = self.p0
+        pI = np.repeat(self.pI_, self.dimI)
+        pE = np.repeat(self.pE_, self.dimE)
 
         if self.options["qp_solver"] == "osqp":
             self.SP = OSQPSubproblemSQPGS(self.dim, p0, pI, pE, self.assert_tol)
@@ -190,12 +283,12 @@ class SQPGS:
 
             B_gI = list()
             for j in np.arange(self.nI_):
-                B_j = sample_points(self.x_k, eps, pI_[j], stack_x=True)
+                B_j = sample_points(self.x_k, eps, pI[j], stack_x=True)
                 B_gI.append(B_j)
 
             B_gE = list()
             for j in np.arange(self.nE_):
-                B_j = sample_points(self.x_k, eps, pE_[j], stack_x=True)
+                B_j = sample_points(self.x_k, eps, pE[j], stack_x=True)
                 B_gE.append(B_j)
 
             ####################################
@@ -383,12 +476,12 @@ class SQPGS:
         return self.x_k
 
 
-def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = True) -> torch.Tensor:
+def sample_points(x: np.ndarray, eps: float, n_points: int, stack_x: bool = True) -> torch.Tensor:
     """Sample ``n_points`` uniformly from the ``eps``-ball around ``x``.
 
     Parameters
     ----------
-    x : torch.Tensor
+    x : np.ndarray
         The centre of the ball.
     eps : float
         Sampling radius.
@@ -404,7 +497,7 @@ def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = Tr
     dim = len(x)
     if n_points == 0:
         # return only x
-        X = torch.empty(1, dim)
+        X = torch.zeros(1, dim)
     else:
         U = torch.randn(n_points, dim)
         norm_U = torch.linalg.norm(U, axis=1)
@@ -414,10 +507,7 @@ def sample_points(x: torch.Tensor, eps: float, n_points: int, stack_x: bool = Tr
         if stack_x:
             X = torch.vstack((torch.zeros(1, dim), X))
 
-    if isinstance(x, np.ndarray):
-        X += torch.from_numpy(x).reshape(1, -1)
-    else:
-        X += x.reshape(1, -1)
+    X += torch.from_numpy(x).reshape(1, -1)
     return X
 
 

@@ -62,7 +62,7 @@ class OSQPSubproblemSQPGS:
 
     @property
     def status(self) -> str:
-        return self.problem.status
+        return self._res.info.status
 
     def _initialize(self):
         """
@@ -261,12 +261,14 @@ class OSQPSubproblemSQPGS:
             polish=1,
         )
 
-        res = problem.solve()
+        self._res = problem.solve()
 
-        assert res.info.status in OSQP_ALLOWED_STATUS, f"OSQP results in status {res.info.status}."
+        assert (
+            self._res.info.status in OSQP_ALLOWED_STATUS
+        ), f"OSQP results in status {self._res.info.status}."
         self._problem = problem
 
-        primal_solution = res.x
+        primal_solution = self._res.x
 
         self.d = primal_solution[: self.dim]
         self.z = primal_solution[self.dim]
@@ -275,7 +277,7 @@ class OSQPSubproblemSQPGS:
         self.rE = primal_solution[self.dim + 1 + self.nI :]
 
         # extract dual variables = KKT multipliers
-        dual_solution = res.y
+        dual_solution = self._res.y
         lambda_f = dual_solution[: self.p0 + 1]
 
         lambda_gI = list()
