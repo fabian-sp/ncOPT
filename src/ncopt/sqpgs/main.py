@@ -369,7 +369,7 @@ class SQPGS:
             ), f"Value is supposed to be negative, but is {np.abs(self.SP.lambda_f.sum() - rho)}."
 
             # Logging, start after first iteration
-            if iter_k % self.log_every == 1:
+            if iter_k % self.log_every == 0:
                 violI_k = np.maximum(gI_k, 0)
                 violE_k = np.abs(gE_k)
                 viol_k = np.max(np.hstack((violI_k, violE_k)))
@@ -465,7 +465,7 @@ class SQPGS:
         # End of loop
         ##############################################
         self.x_hist = np.vstack(x_hist) if self.store_history else None
-        self.info = {"timings": timings, "metrics": metrics}
+        self.info = {"timings": timings, "metrics": metrics, "log_metrics_every": self.log_every}
         if E_k > self.tol:
             self.status = "max iterations reached"
 
