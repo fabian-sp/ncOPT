@@ -37,7 +37,7 @@ jobs:
       - run: hatch run test
 
       - name: build
-        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
         run: |
           pip install --upgrade build
           python -m build
