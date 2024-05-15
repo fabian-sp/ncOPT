@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - uses: pre-commit/action@v3.0.1
+  
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.12
+            3.11
+            3.10
+            3.9
+            3.8
+      - run: pipx install hatch
+      - run: hatch env create
+      - run: hatch run test
+
+      - name: build
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        run: |
+          pip install --upgrade build
+          python -m build
+
+      - name: publish
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
