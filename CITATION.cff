@@ -2,6 +2,8 @@ cff-version: 1.2.0
 authors:
   - family-names: Schaipp
     given-names: Fabian
-title: "Python implementation of the SQP-GS algorithm"
+  - family-names: Schiele
+    given-names: Philipp
+title: "Constrained optimization for Pytorch using the SQP-GS algorithm."
 version: 0.1.0
-date-released: 2021-09-03
+date-released: 2024-xx-xx

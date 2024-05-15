@@ -1,32 +1,46 @@
 """
-@author: Fabian Schaipp
+Implements Example 5.1 in
+
+    Frank E. Curtis and Michael L. Overton, A sequential quadratic programming
+    algorithm for nonconvex, nonsmooth constrained optimization,
+    SIAM Journal on Optimization 2012 22:2, 474-500, https://doi.org/10.1137/090780201.
+
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib.lines import Line2D
 
-from ncopt.funs import f_rosenbrock, g_max
+from ncopt.functions import ObjectiveOrConstraint
+from ncopt.functions.max_linear import MaxOfLinear
+from ncopt.functions.rosenbrock import NonsmoothRosenbrock
 from ncopt.sqpgs import SQPGS
 
 # %% Setup
 
-f = f_rosenbrock()
-g = g_max()
-
-# could add this equality constraint
-# A = np.eye(2); b = np.ones(2)*5; g1 = g_linear(A, b)
+f = ObjectiveOrConstraint(NonsmoothRosenbrock(a=8.0), dim=2)
+g = MaxOfLinear(
+    params=(torch.diag(torch.tensor([torch.sqrt(torch.tensor(2.0)), 2.0])), -torch.ones(2))
+)
 
 # inequality constraints (list of functions)
-gI = [g]
-# equality constraints (list of functions)
+gI = [ObjectiveOrConstraint(g, dim_out=1)]
+
+# equality constraints
 gE = []
+
+# Optional equality constraint (for testing and education purpose)
+# g2 = ObjectiveOrConstraint(torch.nn.Linear(2, 2), dim_out=2)
+# g2.model.weight.data = torch.eye(2)
+# g2.model.bias.data = torch.zeros(2)
+# gE = [g2]
 
 xstar = np.array([1 / np.sqrt(2), 0.5])  # solution
 
 # %% How to use the solver
 
-problem = SQPGS(f, gI, gE, x0=None, tol=1e-6, max_iter=100, verbose=True)
+problem = SQPGS(f, gI, gE, x0=None, tol=1e-10, max_iter=100, verbose=True)
 x = problem.solve()
 
 print("Distance to solution:", f"{np.linalg.norm(x - xstar):.9f}")
@@ -39,25 +53,21 @@ Z = np.zeros_like(X)
 
 for j in np.arange(X.shape[0]):
     for i in np.arange(X.shape[1]):
-        Z[i, j] = f.eval(np.array([X[i, j], Y[i, j]]))
+        Z[i, j] = f.single_eval(np.array([X[i, j], Y[i, j]]))
 
 # %%
+np.random.seed(1)
+torch.manual_seed(1)
 
 fig, ax = plt.subplots(figsize=(5, 4))
 
-np.random.seed(123)
-
 # Plot contour and solution
 ax.contourf(X, Y, Z, cmap="gist_heat", levels=20, alpha=0.7, antialiased=True, lw=0, zorder=0)
-# ax.contourf(X, Y, Z, colors='lightgrey', levels=20, alpha=0.7,
-#             antialiased=True, lw=0, zorder=0)
-# ax.contour(X, Y, Z, cmap='gist_heat', levels=8, alpha=0.7,
-#             antialiased=True, linewidths=4, zorder=0)
 ax.scatter(xstar[0], xstar[1], marker="*", s=200, c="gold", zorder=1)
 
-for i in range(20):
+for i in range(7):
     x0 = np.random.randn(2)
-    problem = SQPGS(f, gI, gE, x0, tol=1e-6, max_iter=100, verbose=False, store_history=True)
+    problem = SQPGS(f, gI, gE, x0, tol=1e-10, max_iter=100, verbose=False, store_history=True)
     x_k = problem.solve()
     print(x_k)
 
@@ -79,4 +89,4 @@ legend_elements = [
 ax.legend(handles=legend_elements, ncol=3, fontsize=8)
 
 fig.tight_layout()
-fig.savefig("data/img/rosenbrock.png")
+fig.savefig("../data/img/rosenbrock.png")

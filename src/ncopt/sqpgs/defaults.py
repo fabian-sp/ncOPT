@@ -29,9 +29,11 @@ _option_defaults = {
     "xi_y": 1e3,
     "xi_sy": 1e-6,
     "iter_H": 10,
-    "num_points_obj": 2,
-    "num_points_gI": 3,
+    "num_points_obj": 4,
+    "num_points_gI": 4,
     "num_points_gE": 4,
+    "qp_solver": "osqp",
+    "reg_H": 1e-03,
 }
 
 DEFAULT_ARG = Dotdict(_defaults)

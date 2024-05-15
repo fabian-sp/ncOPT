@@ -5,13 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "ncopt"
 dynamic = ["version"]
-description = 'This repository contains a Python implementation of the SQP-GS (Sequential Quadratic Programming - Gradient Sampling) algorithm by Curtis and Overton.'
+description = 'Constrained optimization for Pytorch using the SQP-GS algorithm.'
 readme = "README.md"
 requires-python = ">=3.9"
 license = "BSD-3-Clause"
 keywords = []
 authors = [
-  { name = "fabian-sp", email = "fabian.schaipp@gmail.com" },
+  { name = "Fabian Schaipp", email = "fabian.schaipp@tum.de" },
+  {name = "Philipp Schiele", email = ""},
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -27,7 +28,7 @@ dependencies = [
   "numpy",
   "torch",
   "cvxpy-base",
-  "clarabel",
+  "osqp",
 ]
 
 [project.urls]
