@@ -40,10 +40,16 @@ Key functionalities of the package:
 
 ## Installation
 
-For an editable version of this package in your Python environment, run the command
+The package is available from PyPi with
 
 ```
     python -m pip install ncopt
+```
+
+Alternatively, for an editable version of this package in your Python environment, clone this repository and run the command
+
+```
+   python -m pip install --editable .
 ```
 
 ## Getting started
