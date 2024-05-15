@@ -1,5 +1,5 @@
 # ncOPT
-This repository is for solving **constrained optimization problems** where objective and/or constraint functions are (arbitrary) **Pytorch modules**. It is mainly intended for optimization with pre-trained networks, but might be useful also in other contexts.
+This repository is for solving **constrained optimization problems** where objective and/or constraint functions are (arbitrary) **PyTorch modules**. It is mainly intended for optimization with pre-trained networks, but might be useful also in other contexts.
 
 ## Short Description
 
@@ -16,7 +16,7 @@ where `f`, `g` and `h` are locally Lipschitz functions.
 Key functionalities of the package:
 
 * forward and backward pass of functions can be done on GPU
-* batched evaluation and Jacobian computation using Pytorch's `autograd`; no gradient implementation needed
+* batched evaluation and Jacobian computation using PyTorch's `autograd`; no gradient implementation needed
 * support for inequality *and* equality constraints; constraints can use only a subset of the optimization variable as input
 
 
@@ -43,7 +43,7 @@ Key functionalities of the package:
 For an editable version of this package in your Python environment, run the command
 
 ```
-    python -m pip install --editable .
+    python -m pip install ncopt
 ```
 
 ## Getting started
@@ -59,7 +59,7 @@ The SQP-GS solver can be called via
     problem = SQPGS(f, gI, gE)
     problem.solve()
 ```
-Here `f` is the objective function, and `gI` and `gE` are a list of inequality and equality constaints. An empty list can be passed if no (in)equality constraints are needed.
+Here `f` is the objective function, and `gI` and `gE` are a list of inequality and equality constraints. An empty list can be passed if no (in)equality constraints are needed.
 
 ### The `ObjectiveOrConstraint` class
 
@@ -117,7 +117,7 @@ This problem has dimension 256, with one scalar constraint. To give a feeling fo
 
 ### Pretrained neural network constraint
 
-This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max(\sqrt{2}x_1, 2x_2) -1 $. Then, we load the model checkpoint to use it as constraint.
+This toy example illustrates how to use a pretrained neural network as constraint function in `ncOPT`. We train a simple model to learn the mapping $(x_1,x_2) \mapsto \max(\sqrt{2}x_1, 2x_2) -1$. Then, we load the model checkpoint to use it as constraint.
 
 Below we show the feasible set (in blue), and the final iterate, if we use as objective the squared distance to the vector of ones.
 
